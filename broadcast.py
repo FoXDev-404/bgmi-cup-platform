@@ -509,8 +509,10 @@ def create_match(conn, group_name, map_name="Erangel", notes="", who=""):
         "created_at, notes) VALUES (?, ?, ?, 'upcoming', ?, ?)",
         (number, group_name, map_name, now_iso(), _clamp_str(notes, 300)))
     match_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+    label = (group_name if group_name.lower().startswith("group ")
+             else "Group " + group_name)
     _log_event(conn, match_id, "create", None,
-               "Match %d created — Group %s on %s" % (number, group_name, map_name))
+               "Match %d created — %s on %s" % (number, label, map_name))
     return get_match(conn, match_id)
 
 

@@ -6,13 +6,19 @@
   var esc = BC.esc;
   var $ = function (id) { return document.getElementById(id); };
 
+  /* Data already stores "Group A"; only add the word when it's missing. */
+  function grp(n) {
+    n = String(n == null ? '' : n).trim();
+    return !n ? '' : (/^group\b/i.test(n) ? n : 'Group ' + n);
+  }
+
   function load() {
     BC.api('/api/live/state').then(function (x) {
       if (x.s !== 200 || !x.d.ok) return;
       var d = x.d;
       var m = d.match;
       $('casterMatch').textContent = m
-        ? 'Match ' + m.match_number + ' — Group ' + m.group_name + ' · ' + m.map
+        ? 'Match ' + m.match_number + ' — ' + grp(m.group_name) + ' · ' + m.map
         : 'No matches yet';
       var live = m && m.status === 'live';
       $('casterStatus').textContent = m ? (m.status || '').replace(/_/g, ' ') : '—';

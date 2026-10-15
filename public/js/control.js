@@ -9,6 +9,13 @@
   var esc = BC.esc;
   var $ = function (id) { return document.getElementById(id); };
 
+  /* Group names in the data already read "Group A" — only add the word
+     when a custom group name doesn't carry it. */
+  function grp(n) {
+    n = String(n == null ? '' : n).trim();
+    return !n ? '' : (/^group\b/i.test(n) ? n : 'Group ' + n);
+  }
+
   var matchId = null;         // currently open match
   var matches = [];           // list for the picker
   var state = null;           // match_state payload
@@ -40,7 +47,7 @@
       sel.innerHTML = matches.map(function (m) {
         return '<option value="' + m.id + '">' +
           (m.status === 'live' ? '● LIVE · ' : '') +
-          'Match ' + m.match_number + ' — Group ' + esc(m.group_name) +
+          'Match ' + m.match_number + ' — ' + esc(grp(m.group_name)) +
           ' (' + esc(m.map) + ')</option>';
       }).join('');
       if (!matches.length) {
@@ -230,7 +237,7 @@
     if (!state) return;
     var m = state.match;
     $('deskMatchNo').textContent = 'Match ' + m.match_number;
-    $('deskMeta').textContent = 'Group ' + m.group_name + ' · ' + m.map;
+    $('deskMeta').textContent = grp(m.group_name) + ' · ' + m.map;
     var stampCls = m.status === 'live' ? 'bc-stamp bc-stamp--live'
       : (m.status === 'published' ? 'bc-stamp bc-stamp--done' : 'bc-stamp');
     var stampTxt = { 'upcoming': 'Upcoming', 'live': 'LIVE',

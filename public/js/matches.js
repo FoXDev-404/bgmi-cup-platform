@@ -8,6 +8,12 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
+  /* Data already stores "Group A"; only add the word when it's missing. */
+  function grp(n) {
+    n = String(n == null ? '' : n).trim();
+    return !n ? '' : (/^group\b/i.test(n) ? n : 'Group ' + n);
+  }
+
   /* ---- render ---------------------------------------------------------- */
 
   function statusStamp(status) {
@@ -32,7 +38,7 @@
       '.csv" title="Download this match\'s results CSV">CSV</a>');
     return '<article class="bc-match">' +
       '<div class="bc-match-n">Match ' + m.match_number + '</div>' +
-      '<div class="bc-match-meta">Group ' + esc(m.group_name) + ' &middot; ' +
+      '<div class="bc-match-meta">' + esc(grp(m.group_name)) + ' &middot; ' +
       esc(m.map) + ' &middot; ' + m.team_count + ' squads &middot; ' +
       m.placed_count + '/' + m.team_count + ' placed</div>' +
       statusStamp(m.status) +
@@ -70,15 +76,15 @@
     checkinMatch = matches.filter(function (m) { return m.id === id; })[0];
     if (!checkinMatch) return;
     $('checkinTitle').textContent = 'Check-in — Match ' +
-      checkinMatch.match_number + ' (Group ' + checkinMatch.group_name + ')';
+      checkinMatch.match_number + ' (' + grp(checkinMatch.group_name) + ')';
     BC.api('/api/admin/matches/' + id).then(function (x) {
       if (x.s !== 200 || !x.d.ok) { BC.toast('Could not load match', true); return; }
       var checked = {};
       x.d.state.teams.forEach(function (t) { checked[t.teamId] = true; });
       var eligible = x.d.eligible || [];
       if (!eligible.length) {
-        $('checkinList').innerHTML = '<div class="bc-empty">No approved teams in group ' +
-          esc(checkinMatch.group_name) + ' yet &mdash; approve some in the Control Room first.</div>';
+        $('checkinList').innerHTML = '<div class="bc-empty">No approved teams in ' +
+          esc(grp(checkinMatch.group_name)) + ' yet &mdash; approve some in the Control Room first.</div>';
       } else {
         $('checkinList').innerHTML = eligible.map(function (t) {
           return '<label class="bc-checkin"><input type="checkbox" value="' +

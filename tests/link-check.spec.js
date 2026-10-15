@@ -253,3 +253,27 @@ test('unknown URLs get the themed 404 with status 404', async ({ page }) => {
     base + '/images/team/definitely-missing.png');
   expect(asset.status(), 'missing asset status').toBe(404);
 });
+
+test('nav and footer sitemap carry no duplicate links', async ({ page }) => {
+  // #navLinks is the navbar on every page; the footer sitemap items are
+  // .f-link (the big .footer-cta button intentionally repeats the register
+  // CTA, it is not a sitemap item). Pre-auth admin shells render an empty
+  // #navLinks, tolerated here; a global floor guards against selector rot.
+  let totalNav = 0;
+  for (const p of PAGES) {
+    await page.goto(base + p, { waitUntil: 'load' });
+    /** @type {{nav: string[], foot: string[]}} */
+    const groups = await page.evaluate(() => ({
+      nav: [...document.querySelectorAll('#navLinks a[href]')]
+        .map((a) => a.getAttribute('href') + '|' + a.textContent.trim()),
+      foot: [...document.querySelectorAll('footer .f-link[href]')]
+        .map((a) => a.getAttribute('href') + '|' + a.textContent.trim()),
+    }));
+    for (const [where, list] of Object.entries(groups)) {
+      const dup = list.filter((v, i) => list.indexOf(v) !== i);
+      expect(dup, `${p} ${where} duplicate links`).toEqual([]);
+    }
+    totalNav += groups.nav.length;
+  }
+  expect(totalNav, 'nav links seen across pages').toBeGreaterThan(20);
+});

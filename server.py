@@ -41,10 +41,12 @@ from urllib.parse import urlparse, parse_qs, unquote
 # ---------------------------------------------------------------------------
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+PUBLIC_DIR = os.path.join(ROOT, "public")   # web layer (pages, css, js, assets)
+DATA_DIR = os.path.join(ROOT, "data")       # live data: database + uploads
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8080"))
-DB_PATH = os.environ.get("BGMI_DB", os.path.join(ROOT, "registrations.db"))
-UPLOAD_DIR = os.environ.get("BGMI_UPLOADS", os.path.join(ROOT, "uploads"))
+DB_PATH = os.environ.get("BGMI_DB", os.path.join(DATA_DIR, "registrations.db"))
+UPLOAD_DIR = os.environ.get("BGMI_UPLOADS", os.path.join(DATA_DIR, "uploads"))
 RATE_LIMIT = int(os.environ.get("BGMI_RATE_LIMIT", "30"))
 RATE_WINDOW = int(os.environ.get("BGMI_RATE_WINDOW", "3600"))
 STATUS_RATE_LIMIT = int(os.environ.get("BGMI_STATUS_RATE_LIMIT", "5"))
@@ -1318,7 +1320,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_themed_404(self):
         """Serve 404.html (themed page) with a real 404 status."""
-        page = os.path.join(ROOT, "404.html")
+        page = os.path.join(PUBLIC_DIR, "404.html")
         if not os.path.isfile(page):
             return self.send_error(404)
         with open(page, "rb") as f:
@@ -1339,17 +1341,27 @@ class Handler(BaseHTTPRequestHandler):
         blocked_ext = (".py", ".db", ".db-wal", ".db-shm", ".pyc")
         if any(rel.endswith(b) for b in blocked_ext) or rel.startswith("."):
             return self.send_themed_404()
+        # legacy URLs from before the public/ restructure: the old /public/team/
+        # photo dir now lives at /images/team/ (kept working for old links)
+        low_rel = rel.replace("\\", "/")
+        if low_rel == "public/team" or low_rel.startswith("public/team/"):
+            tail = low_rel[len("public/team/"):].lstrip("/")
+            self.send_response(301)
+            self.send_header("Location", "/images/team/" + tail)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         # team logos live in the configured upload dir (BGMI_UPLOADS may put
         # it anywhere — e.g. outside the web root in tests); everything else
-        # is served from the project root
+        # is served from the public/ web layer
         low = rel.lower()
         if low.startswith("uploads/") or low.startswith("uploads\\"):
             base = UPLOAD_DIR
             full = os.path.normpath(
                 os.path.join(UPLOAD_DIR, rel.split("/", 1)[-1].split("\\", 1)[-1]))
         else:
-            base = ROOT
-            full = os.path.normpath(os.path.join(ROOT, rel))
+            base = PUBLIC_DIR
+            full = os.path.normpath(os.path.join(PUBLIC_DIR, rel))
         if full != base and not full.startswith(base + os.sep):
             return self.send_error(404)          # traversal guard
         if not os.path.isfile(full):

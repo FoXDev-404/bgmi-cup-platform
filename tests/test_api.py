@@ -2,8 +2,8 @@
 """
 End-to-end API tests for the BGMI Cup registration server.
 
-Usage:  python test_api.py                     (self-hosted, isolated — see below)
-        BASE=http://127.0.0.1:8080 python test_api.py   (target a running server)
+Usage:  python tests/test_api.py                     (self-hosted, isolated — see below)
+        BASE=http://127.0.0.1:8080 python tests/test_api.py   (target a running server)
 
 Isolation: with no BASE set, the suite boots its own throwaway server on a
 free port with a temporary database and uploads folder, then removes them on
@@ -29,7 +29,7 @@ import time
 import urllib.error
 import urllib.request
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 EXTERNAL = bool(os.environ.get("BASE"))
@@ -56,8 +56,8 @@ PASS = 0
 FAIL = 0
 FAILURES = []
 
-DB_PATH = os.environ.get("BGMI_DB", os.path.join(ROOT, "registrations.db"))
-UPLOADS_DIR = os.environ.get("BGMI_UPLOADS", os.path.join(ROOT, "uploads"))
+DB_PATH = os.environ.get("BGMI_DB", os.path.join(ROOT, "data", "registrations.db"))
+UPLOADS_DIR = os.environ.get("BGMI_UPLOADS", os.path.join(ROOT, "data", "uploads"))
 
 _SERVER_PROC = None
 
@@ -628,7 +628,7 @@ def main():
 
     # ---------- rate limit ----------
     # Runs only when explicitly requested, since the main server usually
-    # runs with a high limit:  BGMI_RATE_LIMIT_TEST=1 python test_api.py
+    # runs with a high limit:  BGMI_RATE_LIMIT_TEST=1 python tests/test_api.py
     if os.environ.get("BGMI_RATE_LIMIT_TEST"):
         print("\n[rate limit]")
         got429 = False

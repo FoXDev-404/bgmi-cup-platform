@@ -6,8 +6,8 @@ Covers: public /status + privacy, the full admin lifecycle (login, queue,
 edit + audit, status actions, slot limit, groups, exports, purge guard) and
 teardown that leaves the database exactly as it found it.
 
-Usage:  python test_admin.py            (server must be running on :8080)
-        BASE=http://127.0.0.1:8090 python test_admin.py
+Usage:  python tests/test_admin.py            (server must be running on :8080)
+        BASE=http://127.0.0.1:8090 python tests/test_admin.py
 
 Reuses the admin fixture helpers from test_api.py (throwaway account,
 deleted at the end — no default credentials anywhere).
@@ -18,7 +18,8 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
 import test_api as T          # noqa: E402  (shared HTTP + fixture helpers)
 import scripts.seed_demo as seed_demo   # noqa: E402

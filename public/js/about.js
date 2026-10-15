@@ -1,15 +1,15 @@
 /* ==========================================================================
    About — team line-up
    Edit the TEAM array below to change members.
-   Photo lookup is "as named": public/team/<name-lowercased>.png
-   (FE_PSYCHO -> public/team/fe_psycho.png). Add `img:` to a member to
+   Photo lookup is "as named": images/team/<name-lowercased>.png
+   (FE_PSYCHO -> images/team/fe_psycho.png). Add `img:` to a member to
    override the path. Missing photo -> initials placeholder in the frame.
    ========================================================================== */
 (function () {
   'use strict';
 
   /* ---------------- TEAM CONFIG — edit me ---------------- */
-  var PHOTO_DIR = 'public/team/';   /* relative, so it works on any host */
+  var PHOTO_DIR = 'images/team/';   /* relative, so it works on any host */
   var PHOTO_EXT = '.png';
 
   var TEAM = [

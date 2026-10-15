@@ -17,10 +17,10 @@ opencode.json.bak-*
 .env.*
 
 # Live data & participant submissions — PII, never commit.
-registrations.db
-registrations.db-wal
-registrations.db-shm
-/uploads/
+# data/ holds the SQLite database and uploaded team logos; only .gitkeep
+# is tracked so the folder exists after a fresh clone.
+/data/*
+!/data/.gitkeep
 /backups/
 
 # Python bytecode
@@ -37,3 +37,7 @@ __pycache__/
 
 # Local tool config — contains a literal MCP password (move to env to version it).
 /opencode.json
+
+# OS cruft
+.DS_Store
+Thumbs.db

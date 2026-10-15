@@ -27,6 +27,8 @@
       <div class="nav-links" id="navLinks">
         <a class="nav-link" href="/rules">Rules</a>
         <a class="nav-link" href="/schedule">Schedule</a>
+        <a class="nav-link" href="/live">Live</a>
+        <a class="nav-link" href="/results">Results</a>
         <a class="nav-link" href="about.html">About</a>
         <a class="nav-link" href="/status">Check status</a>
         <a class="btn-outline btn-sm nav-cta nav-link" href="bgmi-team-registration.html#register">Register team</a>
@@ -80,6 +82,8 @@
           <li><a class="f-link" href="bgmi-team-registration.html#format">Format</a></li>
           <li><a class="f-link" href="/rules">Rules</a></li>
           <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="/live">Live standings</a></li>
+          <li><a class="f-link" href="/results">Results</a></li>
           <li><a class="f-link" href="about.html">About</a></li>
           <li><a class="f-link" href="bgmi-team-registration.html#register">Register team</a></li>
           <li><a class="f-link" href="/status">Check status</a></li>
@@ -113,87 +117,7 @@
     </div>
   </footer>
 
-  <script>
-    (function () {
-      'use strict';
-
-      /* navbar */
-      var navbar = document.getElementById('navbar');
-      function handleNavScroll() {
-        if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 60);
-      }
-      window.addEventListener('scroll', handleNavScroll, { passive: true });
-      handleNavScroll();
-
-      var navToggle = document.getElementById('navToggle');
-      var navLinks = document.getElementById('navLinks');
-      var navOverlay = document.getElementById('navOverlay');
-      function closeNav() {
-        navToggle.classList.remove('active');
-        navLinks.classList.remove('open');
-        navOverlay.classList.add('hidden');
-      }
-      navToggle.addEventListener('click', function () {
-        if (navLinks.classList.contains('open')) { closeNav(); }
-        else {
-          navToggle.classList.add('active');
-          navLinks.classList.add('open');
-          navOverlay.classList.remove('hidden');
-        }
-      });
-      navOverlay.addEventListener('click', closeNav);
-      navLinks.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeNav); });
-
-      /* schedule feed — gated server-side by the public teams switch.
-         Everything from the server is rendered via textContent (never
-         innerHTML), so a schedule note can never inject markup. */
-      var card = document.getElementById('schedCard');
-      var off = document.getElementById('schedOff');
-      var err = document.getElementById('schedErr');
-
-      function fmtWhen(iso) {
-        if (!iso) return '';
-        var d = new Date(iso);
-        if (isNaN(d)) return iso;
-        try {
-          return d.toLocaleString(undefined, {
-            day: '2-digit', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-          });
-        } catch (e) { return d.toISOString(); }
-      }
-
-      fetch('/api/public/schedule').then(function (r) {
-        return r.json().then(function (d) { return { s: r.status, d: d }; });
-      }).then(function (x) {
-        if (x.s === 404) { card.classList.add('hidden'); off.classList.remove('hidden'); return; }
-        if (x.s !== 200 || !x.d.ok) { card.classList.add('hidden'); err.classList.remove('hidden'); return; }
-
-        card.textContent = '';
-        var note = (x.d.schedule || '').trim();
-        var body = document.createElement('p');
-        body.style.whiteSpace = 'pre-wrap';
-        body.style.margin = '0';
-        if (note) {
-          body.textContent = note;
-        } else {
-          body.style.color = 'rgba(237,230,211,.6)';
-          body.textContent = 'The schedule will be posted here. Times and lobbies also appear on /status for registered teams.';
-        }
-        card.appendChild(body);
-
-        var meta = document.createElement('p');
-        meta.style.cssText = 'margin:14px 0 0; font-size:.8rem; letter-spacing:.06em; color:rgba(237,230,211,.5);';
-        var bits = [];
-        if (x.d.timezone) bits.push('Times in ' + x.d.timezone);
-        if (x.d.updatedAt) bits.push('Last updated ' + fmtWhen(x.d.updatedAt));
-        if (bits.length) meta.textContent = bits.join(' · ');
-        card.appendChild(meta);
-      }).catch(function () {
-        card.classList.add('hidden');
-        err.classList.remove('hidden');
-      });
-    })();
-  </script>
+  <script src="js/nav.js?v=1"></script>
+  <script src="js/schedule.js?v=1"></script>
 </body>
 </html>

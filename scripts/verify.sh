@@ -6,7 +6,7 @@
 #    1. python tests/test_api.py / test_admin.py / test_broadcast.py
 #       (each hosts its own throw-away server + DB)
 #    2. npx playwright test            (specs host their own server + DB)
-#    3. the nine stage scripts in tests/e2e/, each against a freshly seeded
+#    3. the ten stage scripts in tests/e2e/, each against a freshly seeded
 #       throw-away DB on http://127.0.0.1:8090
 #
 #  Nothing here touches data/registrations.db, .env or the live 8080 demo
@@ -81,7 +81,8 @@ export VERIFY_ADMIN_USER=verifyadmin
 export VERIFY_ADMIN_PASSWORD=verify-pass-2026
 
 for S in public-site registration-flows status-lookup admin-flows \
-         matches-flows control-desk scoring-check overlays security-a11y; do
+         matches-flows control-desk desk-layout scoring-check overlays \
+         security-a11y; do
   if ! reset_env; then exit 1; fi
   echo "==== stage $S ===="
   node "tests/e2e/$S.js" "$BASE" || FAILED="$FAILED $S"

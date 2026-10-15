@@ -13,7 +13,7 @@
 
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/admin.css?v=5">
-  <link rel="stylesheet" href="/css/control.css?v=2">
+  <link rel="stylesheet" href="/css/control.css?v=4">
   <link rel="stylesheet" href="/css/footer.css?v=1">
 </head>
 <body>
@@ -72,6 +72,66 @@
         <button class="bc-btn" id="endBtn">End &amp; review</button>
       </div>
 
+      <!-- operator layout toolbar -->
+      <div class="bc-toolbar" id="deskToolbar">
+        <div class="bc-tb-g">
+          <span class="bc-tb-l" id="tblGrid">Grid</span>
+          <div class="bc-seg" id="segGrid" role="group" aria-labelledby="tblGrid"
+               title="Cards per row — Alt+1…6, Alt+0 = Auto">
+            <button type="button" data-cols="1" title="1 column (Alt+1)">1</button>
+            <button type="button" data-cols="2" title="2 columns (Alt+2)">2</button>
+            <button type="button" data-cols="3" title="3 columns (Alt+3)">3</button>
+            <button type="button" data-cols="4" title="4 columns (Alt+4)">4</button>
+            <button type="button" data-cols="5" title="5 columns (Alt+5)">5</button>
+            <button type="button" data-cols="6" title="6 columns (Alt+6)">6</button>
+            <button type="button" data-cols="auto" title="Auto — about one column per 320px (Alt+0)">Auto</button>
+          </div>
+        </div>
+        <div class="bc-tb-g">
+          <span class="bc-tb-l" id="tblSize">Size</span>
+          <div class="bc-seg" id="segSize" role="group" aria-labelledby="tblSize">
+            <button type="button" data-size="comfortable" title="Comfortable card density">Comfortable</button>
+            <button type="button" data-size="compact" title="Compact card density">Compact</button>
+            <button type="button" data-size="tight" title="Tight card density">Tight</button>
+          </div>
+        </div>
+        <div class="bc-tb-g">
+          <span class="bc-tb-l" id="tblSide">Standings</span>
+          <div class="bc-seg" id="segSide" role="group" aria-labelledby="tblSide">
+            <button type="button" data-side="side" title="Standings in a side column">Side</button>
+            <button type="button" data-side="bottom" title="Standings as a strip under the cards">Bottom</button>
+            <button type="button" data-side="drawer" title="Standings slide in from the right">Drawer</button>
+            <button type="button" data-side="hidden" title="Hide standings (undo stays reachable)">Hidden</button>
+          </div>
+        </div>
+        <div class="bc-tb-g bc-tb-g--tools">
+          <button type="button" class="bc-tbtn" id="focusBtn" title="Hide the header — Esc exits">Focus</button>
+          <div class="bc-seg bc-seg--zoom" role="group" aria-label="Card zoom">
+            <button type="button" id="zoomOut" title="Smaller cards (80%–120%)" aria-label="Zoom out">A&minus;</button>
+            <span class="bc-zoom-val" id="zoomVal" aria-live="polite">100%</span>
+            <button type="button" id="zoomIn" title="Bigger cards (80%–120%)" aria-label="Zoom in">A+</button>
+          </div>
+          <button type="button" class="bc-tbtn" id="foldAllBtn">Collapse all</button>
+          <button type="button" class="bc-tbtn" id="resetLayoutBtn"
+                  title="Restore grid, size, standings, zoom and focus defaults">Reset layout</button>
+        </div>
+        <div class="bc-tb-g bc-tb-g--find">
+          <input type="search" class="bc-search" id="cardSearch" placeholder="Team or tag…"
+                 aria-label="Filter cards by team name or tag">
+          <div class="bc-seg" id="segFilter" role="group" aria-label="Filter cards">
+            <button type="button" data-filter="alive" title="Squads with players still in">Alive only</button>
+            <button type="button" data-filter="dead" title="Fully wiped squads">Eliminated</button>
+          </div>
+          <label class="bc-tb-l" for="sortPick">Sort</label>
+          <select class="bc-sort" id="sortPick" aria-label="Sort cards">
+            <option value="slot">Slot</option>
+            <option value="points">Points</option>
+            <option value="placement">Placement</option>
+          </select>
+        </div>
+        <p class="bc-tb-help">Alt+1…6 columns &middot; Alt+0 auto &middot; Esc exit focus</p>
+      </div>
+
       <div class="bc-desk-grid">
         <!-- squad grid -->
         <section>
@@ -102,6 +162,9 @@
         </aside>
       </div>
 
+      <!-- standings bottom strip (the aside is re-parented here by the layout JS) -->
+      <div class="bc-side-bottom" id="sideBottom" hidden></div>
+
       <!-- verify + publish -->
       <div class="bc-publish-bar">
         <span class="bc-problem hidden" id="publishProblem"></span>
@@ -111,6 +174,16 @@
         </button>
         <button class="bc-btn" id="unpublishBtn" hidden>Unpublish</button>
       </div>
+
+      <!-- standings drawer + floating helpers (moved/filled by the layout JS) -->
+      <div class="bc-drawer-back" id="drawerBack" hidden></div>
+      <aside class="bc-drawer" id="sideDrawer" aria-label="Standings drawer" hidden>
+        <button type="button" class="bc-drawer-x" id="drawerClose"
+                aria-label="Close standings drawer">&#10005;</button>
+      </aside>
+      <button type="button" class="bc-drawer-tab" id="drawerTab" hidden>Standings</button>
+      <button type="button" class="bc-float-undo" id="floatUndo" hidden>&#8630; Undo last action</button>
+      <button type="button" class="bc-focus-exit" id="focusExit" hidden>Exit focus &middot; Esc</button>
     </div>
   </main>
 
@@ -157,6 +230,6 @@
 
   <script src="/js/nav.js?v=1"></script>
   <script src="/js/admin-shell.js?v=1"></script>
-  <script src="/js/control.js?v=2"></script>
+  <script src="/js/control.js?v=4"></script>
 </body>
 </html>

@@ -180,12 +180,6 @@ function dbToken() {
 
   /* ---------- score the match ---------- */
   console.log('\n[desk actions]');
-  const finA0 = parseInt(await stat(A, 'FIN'), 10);
-  await page.click('.bc-squad[data-team="' + A + '"] .bc-fin[data-delta="1"]');
-  await waitStat(A, 'FIN', String(finA0 + 1));
-  check('unassigned + FINISH bumps the squad FIN', true,
-    'FIN ' + finA0 + ' -> ' + (finA0 + 1));
-
   await clickField(B, 0, 'kill', '1');
   const bkill = await playerRow(B, 0).locator('.bc-kcount').textContent();
   check('player finish counter + squad FIN follow the kill',

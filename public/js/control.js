@@ -2,8 +2,11 @@
    Talks to /api/admin/match* (session + CSRF via admin-shell). Updates stream
    in through the admin SSE channel with a 2s polling fallback.
    Card layout: slot badge / tag / name+group / FIN · PLACE · PTS / chevron,
-   a control row (+FINISH, −, PLACE stepper, AUTO, gear) and exactly four
-   player rows (index, IGN + UID, DMG stepper, finish counter, status icons). */
+   a control row (PLACE stepper, AUTO, gear) and exactly four
+   player rows (index, IGN + UID, DMG stepper, finish counter, status icons).
+   The operator toolbar on top drives grid columns (1-6 / AUTO), card density,
+   standings position (side / bottom / drawer / hidden), focus, zoom, folding,
+   sort and filter — all remembered per operator in localStorage. */
 (function () {
   'use strict';
   var esc = BC.esc;
@@ -24,6 +27,172 @@
   var timerT = null;
   var folded = {};            // teamId -> true when the card is collapsed
   var conflicts = {};         // teamId -> epoch ms until the badge shows
+
+  /* ---- operator layout (grid / size / standings / zoom / focus) ----------- */
+
+  var LS = { cols: 'bgmi.desk.cols', size: 'bgmi.desk.size',
+             side: 'bgmi.desk.side', zoom: 'bgmi.desk.zoom' };
+  function lsGet(key, ok, dflt) {
+    try {
+      var v = window.localStorage.getItem(key);
+      return ok.indexOf(v) !== -1 ? v : dflt;
+    } catch (err) { return dflt; }
+  }
+  function lsSet(key, value) {
+    try {
+      if (value == null) window.localStorage.removeItem(key);
+      else window.localStorage.setItem(key, value);
+    } catch (err) { /* storage blocked — keep the choice for this session */ }
+  }
+
+  var prefs = {
+    cols: lsGet(LS.cols, ['1', '2', '3', '4', '5', '6', 'auto'], '4'),
+    size: lsGet(LS.size, ['auto', 'comfortable', 'compact', 'tight'], 'auto'),
+    side: lsGet(LS.side, ['auto', 'side', 'bottom', 'drawer', 'hidden'], 'auto'),
+    zoom: parseInt(lsGet(LS.zoom, ['80', '90', '100', '110', '120'], '100'), 10)
+  };
+  var sizeAuto = prefs.size === 'auto';   // density follows the grid until picked
+  var sideAuto = prefs.side === 'auto';   // standings follow the grid until picked
+  var sideMode = null;                    // last applied standings position
+  var sortBy = 'slot';                    // slot | points | placement
+  var filter = '';                        // '' | alive | dead
+  var searchQ = '';
+
+  function segMark(id, attr, value) {
+    $(id).querySelectorAll('button').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset[attr] === value));
+    });
+  }
+
+  function autoCols() {
+    var w = $('squadGrid').clientWidth ||
+      document.documentElement.clientWidth || 1280;
+    return Math.max(1, Math.floor(w / 320));   // about one column per 320px
+  }
+  function effectiveCols() {
+    var n = prefs.cols === 'auto' ? autoCols() : parseInt(prefs.cols, 10);
+    n = Math.max(1, Math.min(6, n));
+    if (window.matchMedia('(max-width: 768px)').matches) n = Math.min(n, 2);
+    return n;
+  }
+
+  function applySize(name) {
+    $('squadGrid').dataset.size = name;
+    segMark('segSize', 'size', name);
+  }
+  function applySide(name) {
+    var aside = document.querySelector('#deskBody aside.bc-side');
+    if (!aside) return;
+    var changed = sideMode !== name;
+    sideMode = name;
+    $('deskBody').dataset.side = name;
+    if (name === 'drawer') {
+      if (aside.parentNode !== $('sideDrawer')) $('sideDrawer').appendChild(aside);
+      $('sideDrawer').hidden = false;
+      if (changed) { closeDrawer(); $('drawerTab').hidden = false; }
+    } else {
+      $('sideDrawer').hidden = true;
+      $('drawerBack').hidden = true;
+      $('drawerTab').hidden = true;
+      $('sideDrawer').classList.remove('bc-drawer--open');
+      if (name === 'bottom') {
+        if (aside.parentNode !== $('sideBottom')) $('sideBottom').appendChild(aside);
+        $('sideBottom').hidden = false;
+      } else {
+        var home = document.querySelector('#deskBody .bc-desk-grid');
+        if (aside.parentNode !== home) home.appendChild(aside);
+        $('sideBottom').hidden = true;
+      }
+    }
+    updateUndoFloat();
+  }
+  function applyLayout() {
+    var cols = effectiveCols();
+    $('squadGrid').style.setProperty('--cols', cols);
+    segMark('segGrid', 'cols', prefs.cols);
+    if (sizeAuto) applySize(cols >= 4 ? 'compact' : 'comfortable');
+    else applySize(prefs.size);
+    var side = sideAuto ? (cols >= 4 ? 'drawer' : 'side') : prefs.side;
+    applySide(side);
+    segMark('segSide', 'side', side);
+    $('squadGrid').style.setProperty('--zoom', prefs.zoom / 100);
+    $('zoomVal').textContent = prefs.zoom + '%';
+    $('zoomOut').disabled = prefs.zoom <= 80;
+    $('zoomIn').disabled = prefs.zoom >= 120;
+  }
+
+  function pickCols(v) {
+    prefs.cols = v;
+    lsSet(LS.cols, v);
+    applyLayout();
+  }
+  function setSize(name) {
+    sizeAuto = false;
+    prefs.size = name;
+    lsSet(LS.size, name);
+    applyLayout();
+  }
+  function setSide(name) {
+    var was = sideMode;
+    sideAuto = false;
+    prefs.side = name;
+    lsSet(LS.side, name);
+    applyLayout();
+    if (name === 'drawer') {
+      if (was === 'drawer' &&
+          $('sideDrawer').classList.contains('bc-drawer--open')) {
+        closeDrawer();
+      } else {
+        openDrawer();
+      }
+    }
+  }
+  function openDrawer() {
+    $('sideDrawer').classList.add('bc-drawer--open');
+    $('drawerBack').hidden = false;
+    $('drawerTab').hidden = true;
+    updateUndoFloat();
+  }
+  function closeDrawer() {
+    $('sideDrawer').classList.remove('bc-drawer--open');
+    $('drawerBack').hidden = true;
+    if ($('deskBody').dataset.side === 'drawer') $('drawerTab').hidden = false;
+    updateUndoFloat();
+  }
+  function updateUndoFloat() {
+    var mode = $('deskBody').dataset.side;
+    var logHidden = mode === 'hidden' || (mode === 'drawer' &&
+      !$('sideDrawer').classList.contains('bc-drawer--open'));
+    $('floatUndo').hidden = !logHidden;
+  }
+  function setFocus(on) {
+    document.body.classList.toggle('bc-focus', on);
+    $('focusBtn').textContent = on ? 'Exit focus' : 'Focus';
+    $('focusBtn').setAttribute('aria-pressed', String(on));
+    $('focusExit').hidden = !on;
+  }
+  function bumpZoom(d) {
+    prefs.zoom = Math.max(80, Math.min(120, prefs.zoom + d));
+    lsSet(LS.zoom, String(prefs.zoom));
+    applyLayout();
+  }
+  function foldAll() {
+    if (!state) return;
+    var target = !state.teams.every(function (t) { return folded[t.teamId]; });
+    state.teams.forEach(function (t) {
+      if (target) folded[t.teamId] = true;
+      else delete folded[t.teamId];
+    });
+    render();
+  }
+  function resetLayout() {
+    prefs.cols = '4'; prefs.size = 'auto'; prefs.side = 'auto'; prefs.zoom = 100;
+    sizeAuto = true; sideAuto = true;
+    lsSet(LS.cols, null); lsSet(LS.size, null);
+    lsSet(LS.side, null); lsSet(LS.zoom, null);
+    setFocus(false);
+    applyLayout();
+  }
 
   var STATUS_BTNS = [
     ['alive', 'Alive', 'bc-st--alive',
@@ -89,7 +258,9 @@
     var run = function () {
       var job = pending.shift();
       if (!job) { busy = false; return; }
-      job().then(function () { run(); });
+      /* release the queue on failure too — one bad request must never
+         wedge every later action until a reload */
+      job().then(function () { run(); }, function () { run(); });
     };
     run();
   }
@@ -116,6 +287,11 @@
             loadState();
           }
         }
+      }, function () {
+        /* transport failure (connection reset, offline) — tell the operator
+           and resync instead of silently wedging the queue */
+        BC.toast('Action not sent — connection lost. Try again.', true);
+        loadState();
       });
     });
     push();
@@ -155,7 +331,9 @@
       }).join('');
       return '<div class="bc-player bc-player--' + esc(p.status) + '">' +
         '<span class="bc-pidx">' + (i + 1) + '</span>' +
-        '<span class="bc-pid"><b>' + esc(p.name) + '</b>' +
+        '<span class="bc-pid"><b title="' + esc(p.name) + ' — UID ' + esc(p.uid) +
+        '" aria-label="' + esc(p.name) + ' UID ' + esc(p.uid) + '">' +
+        esc(p.name) + '</b>' +
         '<small>UID ' + esc(p.uid) + '</small></span>' +
         '<span class="bc-stepper" role="group" aria-label="Damage for ' +
         esc(p.name) + '">' +
@@ -208,11 +386,6 @@
       '<button type="button" role="menuitem" data-act="reset">&#8634; Reset team</button>' +
       '</div></div>' +
       '<div class="bc-ctl">' +
-      '<button type="button" class="bc-fin" data-act="fin" data-delta="1" ' +
-      'title="Unassigned finish — no player credited">+ FINISH</button>' +
-      '<button type="button" class="bc-fin bc-fin--minus" data-act="fin" ' +
-      'data-delta="-1" title="Remove an unassigned finish" ' +
-      'aria-label="Remove unassigned finish">&minus;</button>' +
       '<span class="bc-stepper bc-stepper--place" role="group" ' +
       'aria-label="Placement for ' + esc(t.teamName) + '">' +
       '<button type="button" data-act="place" data-step="-1" ' +
@@ -253,15 +426,55 @@
     $('endBtn').disabled = m.status !== 'live';
     $('unpublishBtn').hidden = m.status !== 'published';
 
-    /* squad grid — stable slot order so cards never jump mid-match */
-    var bySlot = state.teams.slice().sort(function (a, b) {
-      return (a.slot || 0) - (b.slot || 0);
-    });
+    /* squad grid — operator sort/filter; slot order is the stable default */
+    var teams = state.teams.slice();
+    if (filter === 'alive') {
+      teams = teams.filter(function (t) { return (t.alive + t.knocked) > 0; });
+    } else if (filter === 'dead') {
+      teams = teams.filter(function (t) {
+        return t.players.length > 0 && t.alive === 0 && t.knocked === 0;
+      });
+    }
+    if (searchQ) {
+      var q = searchQ.toLowerCase();
+      teams = teams.filter(function (t) {
+        return (t.teamName || '').toLowerCase().indexOf(q) !== -1 ||
+          (t.teamTag || '').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    if (sortBy === 'points') {
+      teams.sort(function (a, b) {
+        return (b.points - a.points) || ((a.slot || 0) - (b.slot || 0));
+      });
+    } else if (sortBy === 'placement') {
+      teams.sort(function (a, b) {
+        return ((a.placement || 999) - (b.placement || 999)) ||
+          ((a.slot || 0) - (b.slot || 0));
+      });
+    } else {
+      teams.sort(function (a, b) { return (a.slot || 0) - (b.slot || 0); });
+    }
+
     var grid = $('squadGrid');
-    grid.innerHTML = bySlot.map(function (t) {
+    /* keep values the operator typed but has not committed yet */
+    var gkeep = {};
+    grid.querySelectorAll('.bc-dmg, .bc-place-input').forEach(function (inp) {
+      if (inp.value !== inp.defaultValue) {
+        gkeep[inp.className + ':' + (inp.dataset.ps || inp.dataset.team)] = inp.value;
+      }
+    });
+    grid.innerHTML = teams.map(function (t) {
       return squadCard(t, total);
-    }).join('');
+    }).join('') ||
+      '<div class="bc-empty">No squads match the current filter.</div>';
+    grid.querySelectorAll('.bc-dmg, .bc-place-input').forEach(function (inp) {
+      var key = inp.className + ':' + (inp.dataset.ps || inp.dataset.team);
+      if (key in gkeep) inp.value = gkeep[key];
+    });
     grid.onclick = onGridClick;
+    $('foldAllBtn').textContent = state.teams.length &&
+      state.teams.every(function (t) { return folded[t.teamId]; })
+      ? 'Expand all' : 'Collapse all';
     grid.querySelectorAll('.bc-dmg').forEach(function (inp) {
       inp.addEventListener('change', function () {
         var t = cardTeam(inp);
@@ -332,11 +545,6 @@
       var open = !menu.classList.contains('hidden');
       closeMenus();
       if (!open) menu.classList.remove('hidden');
-      return;
-    }
-    if (actName === 'fin') {
-      act('/api/admin/match/' + matchId + '/team/' + t.teamId + '/kills',
-          { delta: parseInt(el.dataset.delta, 10) }, t.teamId);
       return;
     }
     if (actName === 'auto') {
@@ -502,6 +710,65 @@
     if (m.status === 'live') timerT = setInterval(set, 1000);
   }
 
+  /* ---- toolbar wiring ------------------------------------------------------ */
+
+  function bindSeg(id, fn) {
+    $(id).addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-cols],button[data-size],' +
+        'button[data-side],button[data-filter]');
+      if (b) fn(b);
+    });
+  }
+  bindSeg('segGrid', function (b) { pickCols(b.dataset.cols); });
+  bindSeg('segSize', function (b) { setSize(b.dataset.size); });
+  bindSeg('segSide', function (b) { setSide(b.dataset.side); });
+  bindSeg('segFilter', function (b) {
+    filter = filter === b.dataset.filter ? '' : b.dataset.filter;
+    segMark('segFilter', 'filter', filter);
+    render();
+  });
+  $('cardSearch').addEventListener('input', function () {
+    searchQ = $('cardSearch').value.trim();
+    render();
+  });
+  $('sortPick').addEventListener('change', function () {
+    sortBy = $('sortPick').value;
+    render();
+  });
+  $('focusBtn').addEventListener('click', function () {
+    setFocus(!document.body.classList.contains('bc-focus'));
+  });
+  $('focusExit').addEventListener('click', function () { setFocus(false); });
+  $('zoomOut').addEventListener('click', function () { bumpZoom(-10); });
+  $('zoomIn').addEventListener('click', function () { bumpZoom(10); });
+  $('foldAllBtn').addEventListener('click', foldAll);
+  $('resetLayoutBtn').addEventListener('click', resetLayout);
+  $('drawerTab').addEventListener('click', openDrawer);
+  $('drawerClose').addEventListener('click', closeDrawer);
+  $('drawerBack').addEventListener('click', closeDrawer);
+  $('floatUndo').addEventListener('click', function () { $('undoBtn').click(); });
+
+  /* keep AUTO honest when the window or the standings mode changes the width,
+     and keep the publish-bar clearance in step with the bar's real height */
+  function watchWidth() {
+    var el = document.querySelector('.bc-desk-grid');
+    if (window.ResizeObserver && el) {
+      new ResizeObserver(function () {
+        if (prefs.cols === 'auto' || sizeAuto || sideAuto) applyLayout();
+      }).observe(el);
+    } else {
+      window.addEventListener('resize', applyLayout);
+    }
+    var bar = document.querySelector('.bc-publish-bar');
+    if (bar && window.ResizeObserver) {
+      var setBar = function () {
+        $('deskBody').style.setProperty('--pubbar', (bar.offsetHeight + 10) + 'px');
+      };
+      new ResizeObserver(setBar).observe(bar);
+      setBar();
+    }
+  }
+
   /* ---- top bar actions ---------------------------------------------------- */
 
   $('startBtn').addEventListener('click', function () {
@@ -530,10 +797,26 @@
 
   document.addEventListener('keydown', function (e) {
     var tag = (e.target.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+    var typing = tag === 'input' || tag === 'select' || tag === 'textarea';
+    /* Alt+1…6 set the column count, Alt+0 hands it back to AUTO */
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !typing &&
+        /^[0-6]$/.test(e.key)) {
+      e.preventDefault();
+      pickCols(e.key === '0' ? 'auto' : e.key);
+      return;
+    }
+    if (typing) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var k = e.key.toLowerCase();
-    if (k === 'escape') { closeMenus(); }
+    if (k === 'escape') {
+      if (document.querySelector('.bc-dlg[open]')) return;   // dialogs close natively
+      if (document.querySelector('.bc-menu:not(.hidden)')) { closeMenus(); return; }
+      if ($('sideDrawer').classList.contains('bc-drawer--open')) {
+        closeDrawer();
+        return;
+      }
+      if (document.body.classList.contains('bc-focus')) setFocus(false);
+    }
     else if (k === 'u') { $('undoBtn').click(); }
     else if (k === 'r') { loadState(); }
     else if (k === 's' && state) {
@@ -545,6 +828,8 @@
   /* ---- boot --------------------------------------------------------------- */
 
   BC.boot(function () {
+    applyLayout();
+    watchWidth();
     loadMatches();
     BC.live('/api/admin/stream', function () {
       loadMatches(matchId);

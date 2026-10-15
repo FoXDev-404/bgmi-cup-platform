@@ -183,7 +183,10 @@ function check(name, ok, detail) {
   }, rnda.id, { timeout: 8000 });
   const finA = await cardA.locator('.bc-squad-stats .bc-stat b').first().textContent();
   check('+1 finish lands on the player and the squad FIN', finA.trim() === '1', finA);
-  await page.click('#undoBtn');
+  /* default layout opens in Drawer mode (closed): the floating undo is the
+     reachable one, the in-panel button when the log is visible */
+  if (await page.locator('#floatUndo').isVisible()) await page.click('#floatUndo');
+  else await page.click('#undoBtn');
   await page.waitForFunction((tid) => {
     const c = document.querySelector(`.bc-squad[data-team="${tid}"]`);
     return c && c.querySelector('.bc-kcount').textContent.trim() === '0';

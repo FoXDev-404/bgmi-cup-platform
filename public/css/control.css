@@ -171,21 +171,25 @@
 .bc-desk-grid { display: grid; grid-template-columns: 1fr 330px; gap: 16px; align-items: start; }
 @media (max-width: 1100px) { .bc-desk-grid { grid-template-columns: 1fr; } }
 
-/* squad cards: compact 3-column grid, one card per team */
-.bc-squads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 1360px) { .bc-squads { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 860px) { .bc-squads { grid-template-columns: 1fr; } }
+/* squad cards: operator-controlled columns via --cols (set by the toolbar JS;
+   AUTO derives the count from the width, ~1 column per 320px, capped at 2 on touch) */
+.bc-squads { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 12px; }
+.bc-squads .bc-empty { grid-column: 1 / -1; }
 
 .bc-squad {
   background: rgba(255,255,255,.03); border: 1px solid var(--line);
   border-radius: var(--radius-lg); padding: 8px 11px 9px; position: relative;
-}
+  min-width: 0;               /* the grid item may shrink below content; */
+}                             /* inner rows/head wrap instead of overflowing */
 .bc-squad--dead { opacity: .52; }
 .bc-squad--conflict { border-color: var(--red); box-shadow: 0 0 0 2px rgba(193,77,64,.28); }
 .bc-squad--folded .bc-ctl,
 .bc-squad--folded .bc-player { display: none; }
 
-.bc-squad-head { display: flex; align-items: center; gap: 7px; position: relative; }
+.bc-squad-head {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 7px; row-gap: 3px; position: relative;
+}
 .bc-slot {
   font-family: var(--font-mono); font-size: .58rem; letter-spacing: .06em;
   color: var(--beige-dim); border: 1px solid var(--line-strong);
@@ -259,20 +263,8 @@
 .bc-menu button:hover { background: var(--acid-dim); color: var(--acid); }
 .bc-menu button + button { border-top: 1px dashed var(--line); }
 
-/* control row: unassigned finish, placement stepper, AUTO, gear */
+/* control row: placement stepper, AUTO, gear */
 .bc-ctl { display: flex; align-items: center; gap: 6px; margin: 7px 0 4px; }
-.bc-fin {
-  font-family: var(--font-mono); font-size: .6rem; font-weight: 700;
-  letter-spacing: .06em; padding: 4px 8px; border-radius: 3px; cursor: pointer;
-  background: rgba(182,255,62,.12); border: 1px solid rgba(182,255,62,.55);
-  color: var(--acid); white-space: nowrap;
-}
-.bc-fin:hover { background: rgba(182,255,62,.22); }
-.bc-fin--minus {
-  background: transparent; border-color: var(--line-strong);
-  color: var(--beige-dim); padding: 4px 7px;
-}
-.bc-fin--minus:hover { color: var(--red); border-color: var(--red); background: var(--red-dim); }
 
 .bc-stepper {
   display: inline-flex; align-items: center; border: 1px solid var(--line-strong);
@@ -294,6 +286,11 @@
   font-size: .76rem;
   -moz-appearance: textfield; appearance: textfield;
 }
+/* in very narrow cards the placement stepper may compress (only its input
+   shrinks) so the control row never wraps or overflows */
+.bc-ctl .bc-stepper--place { flex: 0 1 auto; min-width: 0; }
+.bc-stepper--place .bc-place-input { flex: 0 1 auto; min-width: 16px; }
+.bc-stepper--place button { flex: 0 0 auto; }
 .bc-place-input::-webkit-outer-spin-button,
 .bc-place-input::-webkit-inner-spin-button,
 .bc-dmg::-webkit-outer-spin-button,
@@ -319,13 +316,16 @@
 
 /* player rows */
 .bc-player {
-  display: grid; grid-template-columns: 15px minmax(0, 1fr) auto auto auto;
-  gap: 5px; align-items: center; padding: 4px 0;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 4px 5px; padding: 4px 0;
   border-top: 1px dashed var(--line);
   font-family: var(--font-mono); font-size: .68rem;
 }
-.bc-pidx { color: var(--beige-dim); font-size: .58rem; }
-.bc-pid { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
+.bc-pidx { flex: 0 0 15px; color: var(--beige-dim); font-size: .58rem; }
+.bc-pid {
+  display: flex; flex-direction: column; flex: 1 1 44px; min-width: 44px;
+  line-height: 1.1;
+}
 .bc-pid b {
   font-size: .72rem; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap;
@@ -344,7 +344,7 @@
   -moz-appearance: textfield; appearance: textfield;
 }
 .bc-kcount { min-width: 15px; text-align: center; font-weight: 700; font-size: .72rem; }
-.bc-status-btns { display: flex; gap: 2px; }
+.bc-status-btns { display: flex; gap: 2px; flex: 0 0 auto; }
 .bc-st {
   width: 21px; height: 21px; display: inline-flex; align-items: center;
   justify-content: center; padding: 0; cursor: pointer; opacity: .38;
@@ -415,6 +415,199 @@
   backdrop-filter: blur(4px);
 }
 .bc-publish-bar .bc-problem { font-family: var(--font-mono); font-size: .74rem; color: #f2c14e; }
+
+/* ---- operator layout: toolbar, densities, standings modes ---------------- */
+
+.bc-toolbar {
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: rgba(255,255,255,.02); padding: 8px 12px; margin-bottom: 14px;
+}
+.bc-tb-g { display: flex; align-items: center; gap: 6px; }
+.bc-tb-g--find { margin-left: auto; }
+.bc-tb-l {
+  font-family: var(--font-mono); font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--beige-dim);
+}
+.bc-seg {
+  display: inline-flex; border: 1px solid var(--line-strong); border-radius: 3px;
+  overflow: hidden;
+}
+.bc-seg button {
+  border: 0; background: transparent; color: var(--beige-dim); cursor: pointer;
+  font-family: var(--font-mono); font-size: .66rem; font-weight: 700;
+  letter-spacing: .04em; padding: 5px 8px; min-height: 26px;
+}
+.bc-seg button + button { border-left: 1px solid var(--line); }
+.bc-seg button:hover { color: var(--acid); background: var(--acid-dim); }
+.bc-seg button[aria-pressed="true"] { background: var(--acid); color: #0c0d10; }
+.bc-tbtn {
+  min-height: 26px; font-family: var(--font-mono); font-size: .66rem;
+  border: 1px solid var(--line-strong); border-radius: 3px; background: transparent;
+  color: var(--ink); cursor: pointer; padding: 4px 9px;
+}
+.bc-tbtn:hover { border-color: var(--acid); color: var(--acid); }
+.bc-tbtn[aria-pressed="true"] { border-color: var(--acid); color: var(--acid); }
+.bc-zoom-val {
+  font-family: var(--font-mono); font-size: .64rem; color: var(--beige-dim);
+  padding: 0 7px; min-width: 36px; text-align: center; align-self: center;
+}
+.bc-search {
+  width: 128px; background: rgba(0,0,0,.35); border: 1px solid var(--line-strong);
+  border-radius: 3px; color: var(--ink); font-family: var(--font-mono);
+  font-size: .68rem; padding: 5px 8px;
+}
+.bc-search:focus { outline: none; border-color: var(--acid); }
+.bc-sort {
+  background: rgba(0,0,0,.35); border: 1px solid var(--line-strong);
+  border-radius: 3px; color: var(--ink); font-family: var(--font-mono);
+  font-size: .68rem; padding: 5px 6px;
+}
+.bc-tb-help {
+  flex-basis: 100%; margin: 0; font-family: var(--font-mono); font-size: .6rem;
+  color: var(--beige-dim);
+}
+
+/* densities: Compact (4+ columns) and Tight keep every control on the card */
+.bc-squads[data-size="compact"] { gap: 10px; }
+.bc-squads[data-size="tight"] { gap: 8px; }
+
+.bc-squads[data-size="compact"] .bc-squad { padding: 7px 9px 8px; }
+.bc-squads[data-size="compact"] .bc-squad-head { gap: 5px; }
+.bc-squads[data-size="compact"] .bc-squad-name { font-size: .8rem; max-width: none; }
+.bc-squads[data-size="compact"] .bc-tag { min-width: 24px; height: 24px; font-size: .62rem; }
+.bc-squads[data-size="compact"] .bc-slot { font-size: .54rem; padding: 1px 3px; }
+.bc-squads[data-size="compact"] .bc-squad-tag { font-size: .56rem; }
+.bc-squads[data-size="compact"] .bc-squad-group { font-size: .52rem; }
+.bc-squads[data-size="compact"] .bc-stat { min-width: 22px; }
+.bc-squads[data-size="compact"] .bc-stat small { font-size: .46rem; }
+.bc-squads[data-size="compact"] .bc-stat b { font-size: .78rem; }
+.bc-squads[data-size="compact"] .bc-stat--pts b { font-size: .88rem; }
+.bc-squads[data-size="compact"] .bc-chev { width: 24px; height: 26px; }
+.bc-squads[data-size="compact"] .bc-ctl { gap: 4px; margin: 5px 0 3px; }
+.bc-squads[data-size="compact"] .bc-auto { min-height: 32px; padding: 3px 6px; }
+.bc-squads[data-size="compact"] .bc-gear { width: 32px; height: 32px; }
+.bc-squads[data-size="compact"] .bc-stepper button { width: 22px; height: 32px; }
+.bc-squads[data-size="compact"] .bc-place-input { width: 30px; height: 30px; }
+.bc-squads[data-size="compact"] .bc-dmg { width: 40px; height: 30px; }
+.bc-squads[data-size="compact"] .bc-kcount { min-width: 13px; font-size: .68rem; }
+.bc-squads[data-size="compact"] .bc-st { width: 32px; height: 32px; }
+.bc-squads[data-size="compact"] .bc-st svg { width: 14px; height: 14px; }
+.bc-squads[data-size="compact"] .bc-player {
+  gap: 3px 4px; padding: 3px 0; font-size: .64rem;
+}
+.bc-squads[data-size="compact"] .bc-pidx { flex-basis: 12px; font-size: .54rem; }
+.bc-squads[data-size="compact"] .bc-pid b { font-size: .68rem; }
+.bc-squads[data-size="compact"] .bc-pid small { display: none; }  /* UID lives in the title */
+
+.bc-squads[data-size="tight"] .bc-squad { padding: 5px 7px 6px; }
+.bc-squads[data-size="tight"] .bc-squad-head { gap: 4px; }
+.bc-squads[data-size="tight"] .bc-squad-name { font-size: .74rem; max-width: none; }
+.bc-squads[data-size="tight"] .bc-tag { min-width: 21px; height: 21px; font-size: .56rem; }
+.bc-squads[data-size="tight"] .bc-slot { display: none; }
+.bc-squads[data-size="tight"] .bc-squad-tag { font-size: .54rem; }
+.bc-squads[data-size="tight"] .bc-squad-group { font-size: .5rem; }
+.bc-squads[data-size="tight"] .bc-squad-stats { gap: 5px; }
+.bc-squads[data-size="tight"] .bc-stat { min-width: 20px; }
+.bc-squads[data-size="tight"] .bc-stat small { font-size: .44rem; }
+.bc-squads[data-size="tight"] .bc-stat b { font-size: .72rem; }
+.bc-squads[data-size="tight"] .bc-stat--pts b { font-size: .8rem; }
+.bc-squads[data-size="tight"] .bc-chev { width: 22px; height: 28px; }
+.bc-squads[data-size="tight"] .bc-ctl { gap: 3px; margin: 4px 0 3px; }
+.bc-squads[data-size="tight"] .bc-auto { min-height: 28px; padding: 2px 5px; font-size: .52rem; }
+.bc-squads[data-size="tight"] .bc-gear { width: 28px; height: 28px; }
+.bc-squads[data-size="tight"] .bc-stepper button { width: 18px; height: 28px; }
+.bc-squads[data-size="tight"] .bc-place-input { width: 26px; height: 26px; font-size: .68rem; }
+.bc-squads[data-size="tight"] .bc-dmg { width: 32px; height: 26px; font-size: .6rem; }
+.bc-squads[data-size="tight"] .bc-kcount { min-width: 12px; font-size: .64rem; }
+.bc-squads[data-size="tight"] .bc-st { width: 28px; height: 28px; }
+.bc-squads[data-size="tight"] .bc-st svg { width: 13px; height: 13px; }
+.bc-squads[data-size="tight"] .bc-player {
+  gap: 2px 3px; padding: 2px 0; font-size: .6rem;
+}
+.bc-squads[data-size="tight"] .bc-pidx { display: none; }
+.bc-squads[data-size="tight"] .bc-pid b { font-size: .64rem; }
+.bc-squads[data-size="tight"] .bc-pid small { display: none; }  /* UID lives in the title */
+
+/* touch screens: 44px targets (the JS caps the grid at 2 columns) */
+@media (max-width: 768px) {
+  .bc-squads[data-size] .bc-st { width: 44px; height: 44px; }
+  .bc-squads[data-size] .bc-st svg { width: 17px; height: 17px; }
+  .bc-squads[data-size] .bc-stepper button { width: 30px; height: 44px; }
+  .bc-squads[data-size] .bc-dmg { width: 34px; height: 42px; }
+  .bc-squads[data-size] .bc-place-input { width: 30px; height: 42px; }
+  .bc-squads[data-size] .bc-auto { min-height: 44px; }
+  .bc-squads[data-size] .bc-gear, .bc-squads[data-size] .bc-chev { width: 44px; height: 44px; }
+}
+
+/* zoom scales the card contents; the grid cell keeps its size */
+.bc-squad { zoom: var(--zoom, 1); }
+
+/* standings modes: the aside is re-parented, never re-created, so the live
+   updates (SSE/poll) keep streaming into every mode */
+#deskBody[data-side="bottom"] .bc-desk-grid,
+#deskBody[data-side="drawer"] .bc-desk-grid,
+#deskBody[data-side="hidden"] .bc-desk-grid { grid-template-columns: 1fr; }
+#deskBody[data-side="hidden"] .bc-side { display: none; }
+.bc-side-bottom { margin-top: 16px; }
+.bc-side-bottom[hidden] { display: none; }
+.bc-side-bottom .bc-side {
+  position: static; display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px; align-items: start;
+}
+.bc-side-bottom .bc-eventlog { max-height: 150px; }
+@media (max-width: 900px) { .bc-side-bottom .bc-side { grid-template-columns: 1fr; } }
+
+.bc-drawer {
+  position: fixed; top: 52px; right: 0; bottom: 0; width: min(340px, 92vw);
+  background: #0e1014; border-left: 1px solid var(--line-strong); z-index: 120;
+  padding: 14px; overflow-y: auto; transform: translateX(102%);
+  transition: transform .22s ease;
+}
+.bc-drawer--open { transform: translateX(0); }
+.bc-drawer .bc-side { position: static; }
+.bc-drawer-x {
+  width: 30px; height: 30px; margin: 0 0 10px auto; display: block;
+  border: 1px solid var(--line-strong); border-radius: 3px; background: transparent;
+  color: var(--beige-dim); cursor: pointer; font-size: .8rem; line-height: 1;
+}
+.bc-drawer-x:hover { color: var(--red); border-color: var(--red); }
+.bc-drawer-tab {
+  position: fixed; right: 0; top: 118px; z-index: 105; writing-mode: vertical-rl;
+  font-family: var(--font-mono); font-size: .62rem; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: #0c0d10;
+  background: var(--acid); border: 0; border-radius: 4px 0 0 4px;
+  padding: 12px 6px; cursor: pointer;
+}
+.bc-drawer-back {
+  position: fixed; inset: 52px 0 0 0; background: rgba(6,7,9,.55); z-index: 110;
+}
+.bc-float-undo {
+  position: fixed; right: 16px; bottom: 86px; z-index: 130;
+  font-family: var(--font-mono); font-size: .68rem; font-weight: 700;
+  background: rgba(12,13,16,.95); color: var(--acid); border: 1px solid var(--acid);
+  border-radius: var(--radius); padding: 9px 13px; cursor: pointer;
+  box-shadow: 3px 3px 0 rgba(0,0,0,.5);
+}
+.bc-float-undo:hover { background: var(--acid-dim); }
+.bc-focus-exit {
+  position: fixed; top: 64px; right: 14px; z-index: 140;
+  font-family: var(--font-mono); font-size: .64rem; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: #0c0d10;
+  background: var(--acid); border: 0; border-radius: var(--radius);
+  padding: 9px 12px; cursor: pointer; box-shadow: 3px 3px 0 rgba(0,0,0,.5);
+}
+.bc-float-undo[hidden], .bc-focus-exit[hidden], .bc-drawer-tab[hidden],
+.bc-drawer[hidden], .bc-drawer-back[hidden] { display: none; }
+
+/* focus: the page header goes away and the cards get the window */
+body.bc-focus .bc-head { display: none; }
+body.bc-focus .pan { max-width: none !important; padding-top: 10px; }
+body.bc-focus .bc-desk-top { margin-bottom: 10px; }
+
+/* publish-bar clearance: the last card row never hides under the sticky bar */
+#deskBody { padding-bottom: var(--pubbar, 0px); }
 
 /* ---- overlays producer -------------------------------------------------- */
 

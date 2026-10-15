@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 320" fill="none">
+ <defs><linearGradient id="can" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#1b242b"/><stop offset=".3" stop-color="#87969d"/><stop offset=".55" stop-color="#39464c"/><stop offset="1" stop-color="#11181d"/></linearGradient></defs>
+ <g stroke-linejoin="round" stroke-linecap="round">
+  <path d="M53 47 L126 47 L140 71 L140 255 L126 278 L53 278 L39 255 L39 71 Z" fill="url(#can)" stroke="#a2adb2" stroke-width="5"/>
+  <path d="M45 86 L134 86 L134 110 L45 110 Z" fill="#ffb63f"/>
+  <path d="M46 202 L133 202 L133 226 L46 226 Z" fill="#1a2226" stroke="#7e8b90" stroke-width="3"/>
+  <path d="M69 45 L69 23 L111 23 L111 45" fill="#202b31" stroke="#adb7b9" stroke-width="5"/>
+  <path d="M70 23 L70 12 L112 12 L112 23" stroke="#ffbf4b" stroke-width="5"/>
+  <path d="M56 130 L124 130 M56 144 L124 144 M56 158 L124 158 M56 172 L124 172" stroke="#c7cecf" stroke-opacity=".32" stroke-width="5"/>
+  <path d="M72 239 L108 239 L108 260 L72 260 Z" fill="#0d1419" stroke="#ffbe49" stroke-width="3"/>
+ </g>
+</svg>

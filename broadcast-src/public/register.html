@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#11110d"><title>Team Registration · BGMI Broadcast</title>
+  <link rel="stylesheet" href="/register.css">
+</head>
+<body class="tactical-registration">
+  <div class="register-shell">
+    <header class="reg-topbar"><a class="brand" href="/register"><span class="brand-mark">GG</span><span><b>BGMI BROADCAST</b><small>TOURNAMENT OPERATIONS // TEAM INTAKE</small></span></a><span class="secure-note"><i></i> CAPTAIN AUTHENTICATION REQUIRED</span></header>
+    <main class="reg-layout">
+      <section class="reg-hero">
+        <span class="eyebrow">BATTLEGROUNDS · SEASON 01 · TEAM ENTRY</span>
+        <h1>DROP IN.<br>LOCK YOUR<br><em>SQUAD.</em></h1>
+        <p>Register your squad once. After approval, your saved roster flows directly into group allocation, match lineups, scoring, player leaderboards and the live broadcast.</p>
+        <div class="reg-metrics"><div><strong id="regAccepted">0</strong><small>APPROVED SQUADS</small></div><div><strong id="regCapacity">0 / 96</strong><small>EVENT CAPACITY</small></div><div><strong id="regEventStatus">OPEN</strong><small>REGISTRATION STATUS</small></div></div>
+        <div class="reg-steps"><div><span>01</span><div><b>CAPTAIN ACCOUNT</b><small>Sign in before submitting an application</small></div></div><div><span>02</span><div><b>ROSTER LOCK-IN</b><small>Team, four starters and optional branding</small></div></div><div><span>03</span><div><b>ADMIN REVIEW</b><small>Approved data enters tournament control</small></div></div></div>
+        <div class="field-warning"><b>ONE CAPTAIN ACCOUNT · ONE TEAM</b><span>Duplicate email, mobile number, team name or account submissions are blocked. Contact the organizer if your roster needs a correction.</span></div>
+      </section>
+      <section class="reg-form-panel">
+        <div class="form-heading"><div><span class="eyebrow">PLAYER ENTRY PORTAL</span><h2 id="portalTitle">Captain access</h2><p id="portalSubtitle">Create an account or sign in to continue.</p></div><span class="form-mark">//</span></div>
+        <div id="captainAuthGate" class="captain-auth-gate">
+          <div class="auth-tabs"><button class="auth-tab active" type="button" data-auth-tab="signin">SIGN IN</button><button class="auth-tab" type="button" data-auth-tab="create">CREATE ACCOUNT</button></div>
+          <form id="captainSigninForm" class="captain-auth-form">
+            <label>Email<input name="email" type="email" required maxlength="120" autocomplete="email" placeholder="captain@example.com"></label>
+            <label>Password<input name="password" type="password" required minlength="12" maxlength="128" autocomplete="current-password" placeholder="Your account password"></label>
+            <div id="signinMessage" class="form-message" role="status" aria-live="polite"></div>
+            <button class="submit-btn" type="submit" id="captainSigninBtn">SIGN IN TO REGISTER <span>→</span></button>
+          </form>
+          <form id="captainSignupForm" class="captain-auth-form hidden">
+            <label>Captain full name<input name="captainName" required minlength="2" maxlength="60" autocomplete="name" placeholder="Full name"></label>
+            <label>Contact email<input name="email" type="email" required maxlength="120" autocomplete="email" placeholder="captain@example.com"></label>
+            <label>Mobile number<input id="captainPhone" name="phone" type="tel" required inputmode="numeric" pattern="[0-9]{10,15}" minlength="10" maxlength="15" autocomplete="tel-national" placeholder="10–15 digits only"><small class="input-hint">Numbers only. No spaces, + signs or other characters.</small></label>
+            <label>Create password<input name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password" placeholder="Minimum 12 characters"></label>
+            <div id="signupMessage" class="form-message" role="status" aria-live="polite"></div>
+            <button class="submit-btn" type="submit" id="captainSignupBtn">CREATE CAPTAIN ACCOUNT <span>→</span></button>
+            <p class="form-foot">One captain account can submit one tournament application. Email/SMS OTP verification is not configured in this local build, so identity ownership is not independently verified.</p>
+          </form>
+        </div>
+        <div id="captainSessionPanel" class="captain-session-panel hidden"><div class="session-mark">✓</div><div><span class="eyebrow">AUTHENTICATED CAPTAIN</span><b id="captainSessionName">—</b><small id="captainSessionContact">—</small></div><button id="captainSignoutBtn" type="button" class="quiet-btn">SIGN OUT</button></div>
+        <form id="registrationForm" class="hidden" novalidate>
+          <div class="form-section-title"><span>01</span><b>TEAM IDENTITY</b></div>
+          <label>Team name<input name="teamName" required minlength="2" maxlength="48" placeholder="e.g. TEAM PHOENIX"></label>
+          <label>College, organization or club<input name="college" required minlength="2" maxlength="100" placeholder="Institution or esports club"></label>
+          <div class="form-two"><label>Preferred group<select name="groupPreference"><option value="">Organizer assigns group</option><option value="A">GROUP A</option><option value="B">GROUP B</option><option value="C">GROUP C</option><option value="D">GROUP D</option><option value="E">GROUP E</option><option value="F">GROUP F</option></select></label><label>Team logo URL · optional<input name="teamLogoUrl" type="url" maxlength="500" placeholder="https://…"><small class="input-hint">Use a trusted HTTPS image URL.</small></label></div>
+          <div class="form-section-title player-heading"><span>02</span><b>STARTING LINEUP</b><small>FOUR PLAYERS</small></div><p class="uid-instruction">Enter each player’s BGMI in-game Player UID from their profile. Numeric IDs help the organizer verify the roster and flag duplicate player registrations.</p>
+          <div class="player-grid"><label><span>PLAYER 01 · CAPTAIN</span><input name="player1" required minlength="2" maxlength="48" placeholder="In-game name"><input name="playerUid1" type="text" inputmode="numeric" pattern="[0-9]{6,15}" required maxlength="15" autocomplete="off" placeholder="BGMI Player UID · digits only"><input name="playerAvatar1" type="url" maxlength="500" placeholder="Player image URL · optional"></label><label><span>PLAYER 02</span><input name="player2" required minlength="2" maxlength="48" placeholder="In-game name"><input name="playerUid2" type="text" inputmode="numeric" pattern="[0-9]{6,15}" required maxlength="15" autocomplete="off" placeholder="BGMI Player UID · digits only"><input name="playerAvatar2" type="url" maxlength="500" placeholder="Player image URL · optional"></label><label><span>PLAYER 03</span><input name="player3" required minlength="2" maxlength="48" placeholder="In-game name"><input name="playerUid3" type="text" inputmode="numeric" pattern="[0-9]{6,15}" required maxlength="15" autocomplete="off" placeholder="BGMI Player UID · digits only"><input name="playerAvatar3" type="url" maxlength="500" placeholder="Player image URL · optional"></label><label><span>PLAYER 04</span><input name="player4" required minlength="2" maxlength="48" placeholder="In-game name"><input name="playerUid4" type="text" inputmode="numeric" pattern="[0-9]{6,15}" required maxlength="15" autocomplete="off" placeholder="BGMI Player UID · digits only"><input name="playerAvatar4" type="url" maxlength="500" placeholder="Player image URL · optional"></label></div>
+          <label>Substitute · optional<input name="substitute" maxlength="48" placeholder="Substitute player IGN"></label>
+          <label class="consent"><input type="checkbox" name="consent" required><span>I confirm that the roster information is accurate and can be used to administer this tournament.</span></label>
+          <div id="formMessage" class="form-message" role="status" aria-live="polite"></div>
+          <button class="submit-btn" id="submitRegistration" type="submit">SUBMIT TEAM APPLICATION <span>→</span></button>
+          <p class="form-foot">One application per captain account. Submission does not guarantee a slot; the organizer must approve your team.</p>
+        </form>
+        <div id="successPanel" class="success-panel hidden"><div class="success-icon">✓</div><span class="eyebrow">APPLICATION RECEIVED</span><h2>Roster submitted.</h2><p id="successText">Your application is awaiting organizer review.</p><button class="submit-btn" id="refreshApplication" type="button">REFRESH APPLICATION STATUS <span>↻</span></button></div>
+        <div id="existingApplicationPanel" class="success-panel hidden"><div class="success-icon">✓</div><span class="eyebrow">YOUR TEAM APPLICATION</span><h2 id="existingTeamName">—</h2><p id="existingStatusText">Status: pending</p><p id="existingAssignedText"></p><button class="quiet-btn" id="refreshExistingApplication" type="button">REFRESH STATUS</button></div>
+        <div id="closedPanel" class="closed-panel hidden"><div class="closed-icon">Ⅱ</div><span class="eyebrow">INTAKE PAUSED</span><h2>Registration is closed.</h2><p>Contact the tournament organizer for updates or waitlist information.</p></div>
+      </section>
+    </main>
+    <footer class="reg-footer"><span>BGMI BROADCAST · TEAM INTAKE PORTAL</span><span>TACTICAL OPERATIONS // PLAY FAIR // BROADCAST LIVE</span></footer>
+  </div>
+  <script src="/register.js"></script>
+</body>
+</html>

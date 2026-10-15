@@ -980,25 +980,6 @@ def insert_registration(data, members, ip, logo_path):
             conn.close()
 
 
-def list_registrations():
-    with DB_LOCK:
-        conn = db()
-        try:
-            rows = conn.execute(
-                "SELECT * FROM registrations ORDER BY created_at DESC").fetchall()
-            out = []
-            for r in rows:
-                members = [dict(m) for m in conn.execute(
-                    "SELECT slot, role, ign, uid FROM roster_members "
-                    "WHERE team_id = ? ORDER BY slot", (r["team_id"],))]
-                d = dict(r)
-                d["roster"] = members
-                out.append(d)
-            return out
-        finally:
-            conn.close()
-
-
 def count_registrations():
     with DB_LOCK:
         conn = db()

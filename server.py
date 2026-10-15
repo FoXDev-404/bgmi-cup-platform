@@ -1155,6 +1155,26 @@ class Handler(BaseHTTPRequestHandler):
         # uploaded images can never be sniffed into HTML/script
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        # Strict CSP — every script is external ('self'), no inline handlers.
+        # inline style= attributes remain (style-src unsafe-inline only
+        # affects CSS, not script); Google Fonts for the theme faces.
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'")
+        # admin pages must never be framed (clickjacking); overlay shells
+        # stay frameable so the producer preview iframe works.
+        path = getattr(self, "path", "") or ""
+        self.send_header("X-Frame-Options",
+                         "DENY" if path.startswith("/admin") else "SAMEORIGIN")
         super().end_headers()
 
     def send_csv(self, filename, rows):

@@ -64,12 +64,28 @@ def main(clean=None):
                 conn.execute("DELETE FROM roster_members WHERE team_id IN "
                              "(SELECT team_id FROM registrations "
                              "WHERE reg_code LIKE 'BGMI26-9%')")
+                # demo broadcast rows: match stats first, then matches
+                # (only matches seeded here — identified by demo notes)
+                import broadcast
+                broadcast.migrate(conn)
+                conn.execute("DELETE FROM player_stats WHERE match_id IN "
+                             "(SELECT id FROM matches "
+                             "WHERE notes LIKE 'Demo match%')")
+                conn.execute("DELETE FROM match_team_results WHERE match_id IN "
+                             "(SELECT id FROM matches "
+                             "WHERE notes LIKE 'Demo match%')")
+                conn.execute("DELETE FROM event_log WHERE match_id IN "
+                             "(SELECT id FROM matches "
+                             "WHERE notes LIKE 'Demo match%')")
+                conn.execute("DELETE FROM matches "
+                             "WHERE notes LIKE 'Demo match%'")
                 conn.execute("DELETE FROM registrations "
                              "WHERE reg_code LIKE 'BGMI26-9%'")
                 conn.execute("DELETE FROM groups WHERE name IN "
                              "('Group A','Group B','Group C','Group D')")
                 conn.commit()
-                print("Removed %d demo registrations and demo groups." % n)
+                print("Removed %d demo registrations, demo groups and "
+                      "demo matches." % n)
                 return 0
 
             existing = conn.execute(
@@ -139,9 +155,61 @@ def main(clean=None):
                     (pend["team_id"], "Demo request: our P3 IGN changed to "
                                       "NEWIGN. UID is the same.",
                      now.isoformat()))
+
+            # ---- broadcast section: 2 demo matches + overlay settings ----
+            import broadcast
+            broadcast.migrate(conn)
+            broadcast.set_bsetting(conn, "sponsor_text",
+                                   "Presented by Demo Studios")
+            broadcast.set_bsetting(conn, "theme_color", "#b6ff3e")
+            groups = [r["name"] for r in conn.execute(
+                "SELECT name FROM groups ORDER BY name")]
+            approved = [r["team_id"] for r in conn.execute(
+                "SELECT team_id FROM registrations "
+                "WHERE status = 'approved' AND group_id IS NOT NULL "
+                "ORDER BY team_id")]
+            if len(groups) >= 2 and len(approved) >= 8:
+                g_a = groups[0]
+                lineup_a = [t for t in approved if
+                            conn.execute("SELECT g.name AS n FROM registrations "
+                                         "r LEFT JOIN groups g ON g.id = "
+                                         "r.group_id WHERE r.team_id = ?",
+                                         (t,)).fetchone()["n"] == g_a][:4]
+                if len(lineup_a) >= 2:
+                    # Match 1: finished + published (counts in standings)
+                    m1 = broadcast.create_match(conn, g_a, "Erangel",
+                                                "Demo match one", "seed")
+                    broadcast.set_lineup(conn, m1["id"], lineup_a)
+                    broadcast.start_match(conn, m1["id"], "seed")
+                    kills = (5, 3, 1, 0)
+                    for tid, k in zip(lineup_a, kills):
+                        broadcast.team_kill_delta(conn, m1["id"], tid, k, "seed")
+                        rows = conn.execute(
+                            "SELECT id FROM player_stats WHERE match_id = ? "
+                            "AND team_id = ? ORDER BY id", (m1["id"], tid)).fetchall()
+                        for i, p in enumerate(rows):
+                            if i < k:      # spread kills over the roster
+                                broadcast.player_action(conn, m1["id"], tid, p["id"],
+                                                        "kill", 1, "seed")
+                    for place, tid in enumerate(lineup_a, 1):
+                        broadcast.set_placement(conn, m1["id"], tid, place,
+                                                True, "seed")
+                    broadcast.end_match(conn, m1["id"], "seed")
+                    broadcast.publish_match(conn, m1["id"], "seed")
+
+                # Match 2: still live on the desk (drives /live + overlays)
+                g_b = groups[1] if len(groups) > 1 else g_a
+                lineup_b = [t for t in approved if t not in lineup_a][:4]
+                if len(lineup_b) >= 2:
+                    m2 = broadcast.create_match(conn, g_b, "Miramar",
+                                                "Demo match two", "seed")
+                    broadcast.set_lineup(conn, m2["id"], lineup_b)
+                    broadcast.start_match(conn, m2["id"], "seed")
+                    broadcast.team_kill_delta(conn, m2["id"], lineup_b[0], 2, "seed")
+
             conn.commit()
             print("Seeded 20 demo registrations (BGMI26-9001..9020), "
-                  "3 groups, 8 approved.")
+                  "3 groups, 8 approved, demo matches + overlay settings.")
             return 0
         finally:
             conn.close()

@@ -1,5 +1,33 @@
 # Merge Progress — Registration Site + BGMI Broadcast
 
+## Round 2 (2026-10-15) — 4-player rule · old overlays · new desk cards · BGMI points
+
+Requested follow-ups after the merge dry run. Safety: demo/seed DB only (backup taken:
+`backups/demo-pre-4players-20261015-205758.db`), live DB/uploads/.env untouched, no OBS actions.
+
+- [ ] R2-1. Exactly 4 players per team in a match — **Not started**
+       `player_stats.active` flag + SQLite triggers (hard cap of 4 active per match/team),
+       `match_team_results.unassigned_finishes` (FIN = Σ active player kills + unassigned),
+       repair migration (keep 4 lowest-id actives, bench rest, keep stats), robust starter
+       selection (slot `S*` / role `sub*` never counted), per-match swap (bench + activate sub,
+       event log + audit log, replaced player's stats stay), bench list in desk state, tests.
+- [ ] R2-2. Old broadcast overlays served as-is — **Not started**
+       restore original `overlay.html/.css/.js` (+ assets) from `b91ccef:broadcast-src/`,
+       serve at `/overlay/<scene>` with token gate; tiny `/socket.io/socket.io.js` shim →
+       SSE (`/api/overlay/legacy/stream|state`) + 2 s poll fallback; server-side adapter
+       `legacy_state()` maps merged DB → B's `tournament:update` shape (numeric ids, uid
+       stripped); list requested overlays missing from the old 16-scene set; screenshots.
+- [ ] R2-3. Control desk team card rebuilt to the reference layout — **Not started**
+       slot badge / tag / name+group / FIN·PLACE·PTS / chevron; control row (+FINISH, −,
+       PLACE stepper, AUTO, gear → swap, manual adjustment with reason, reset team);
+       4 player rows (index, IGN + UID, DMG stepper, kill counter, Alive/Knocked/Out icons);
+       eliminated dim + rank badge; conflict badge; compact 16-team grid; responsive.
+- [ ] R2-4. BGMI points table, configurable — **Not started**
+       default 10/6/5/4/3/2/1/1 + 1/finish + manual adjustments (reason + audit); tie-breakers
+       points → wins → placement pts → finish pts → last-match placement (configurable);
+       settings page confirm note; one engine for /live, /results, overlays, CSV; unit tests.
+- [ ] R2-5. Dry run + screenshots + report — **Not started**
+
 Verified by running (2026-10-15): `python tests/test_api.py` (104 ✓), `python tests/test_admin.py` (94 ✓),
 `python tests/test_broadcast.py` (94 ✓), `npx playwright test` (8 ✓ after `npx playwright install chromium`),
 plus an HTTP smoke pass on a temp seeded DB (all public/admin/overlay routes 200, bad overlay token → 403).

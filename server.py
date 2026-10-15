@@ -1713,6 +1713,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.export_approved_csv(who)
         if rest == "export/groups.csv":
             return self.export_groups_csv(who)
+        if rest == "export/standings.csv":
+            return self.export_standings_csv(who)
+        m = re.match(r"^export/match/(\d+).csv$", rest)
+        if m:
+            return self.export_match_csv(int(m.group(1)), who)
         return self.send_json({"ok": False, "error": "Not found."}, 404)
 
     def admin_notifications(self):
@@ -1928,6 +1933,68 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 conn.close()
         return self.send_csv("groups.csv", out)
+
+    def export_standings_csv(self, who=None):
+        """Overall table as CSV — the same engine as /live, /results and the
+        overlays: published matches, configured tie-breakers in order."""
+        with DB_LOCK:
+            conn = db()
+            try:
+                rows = broadcast.standings_rows(conn, None,
+                                                include_live=False)
+                rules = broadcast.load_rules(conn)
+                out = [["rank", "team_id", "team_tag", "team_name", "group",
+                        "matches", "wins", "points", "placement_points",
+                        "finishes", "finish_points", "last_placement",
+                        "tie_breakers"]]
+                for r in rows:
+                    out.append([r["rank"], r["teamId"], r["teamTag"],
+                                r["teamName"], r["group"], r["matches"],
+                                r["wins"], r["points"], r["placementPoints"],
+                                r["kills"], r["finishPoints"],
+                                r["lastPlacement"] or "",
+                                ",".join(rules["tiebreakers"])])
+                if who:                       # exports are logged (PII-free)
+                    audit(conn, who, None, "export", "standings_csv",
+                          None, "%d rows" % (len(out) - 1))
+                    conn.commit()
+            finally:
+                conn.close()
+        return self.send_csv("standings.csv", out)
+
+    def export_match_csv(self, mid, who=None):
+        """One match's results as CSV: placement, finishes, adjustment with
+        its reason, and the engine's final points."""
+        with DB_LOCK:
+            conn = db()
+            try:
+                match = broadcast.get_match(conn, mid)
+                if not match:
+                    return self.send_json(
+                        {"ok": False, "error": "Match not found."}, 404)
+                rows = conn.execute(
+                    "SELECT * FROM match_team_results WHERE match_id = ? "
+                    "ORDER BY CASE WHEN placement IS NULL OR placement = 0 "
+                    "THEN 1 ELSE 0 END, placement, team_id",
+                    (int(mid),)).fetchall()
+                out = [["placement", "team_id", "team_tag", "team_name",
+                        "group", "finishes", "adjustment",
+                        "adjustment_reason", "points"]]
+                for r in rows:
+                    pub = broadcast.team_public_row(
+                        conn, r["team_id"], match["group_name"])
+                    out.append([
+                        r["placement"] or "", r["team_id"], pub["teamTag"],
+                        pub["teamName"], pub["group"], r["kills"],
+                        r["adjustment"], r["adjustment_reason"],
+                        r["points"]])
+                if who:                       # exports are logged (PII-free)
+                    audit(conn, who, None, "export", "match_csv_%d" % mid,
+                          None, "%d rows" % (len(out) - 1))
+                    conn.commit()
+            finally:
+                conn.close()
+        return self.send_csv("match-%d-results.csv" % int(mid), out)
 
     # ---- POST -------------------------------------------------------------
 

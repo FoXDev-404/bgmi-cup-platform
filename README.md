@@ -113,9 +113,13 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
    card shows on the caster desk (the original overlay set has no card
    scene — see docs/merge-progress.md R2-2 for the missing-scene list).
 
-Scoring: placement points `{1:10, 2:6, 3:5, 4:4, 5:3, 6:2, 7:1, 8:1}` + 1 pt
-per kill (tunable on `/admin/matches`). Tie-breakers: points → wins →
-placement points → kills → last-match placement.
+Scoring: placement points `{1:10, 2:6, 3:5, 4:4, 5:3, 6:2, 7:1, 8:1}` (9th+ = 0)
++ 1 pt per finish, all tunable on `/admin/matches` — change the table and
+every table (desk, `/live`, `/results`, overlays, CSV exports) follows it.
+Tie-breakers apply in order after total points; default: wins (1st places) →
+placement points → finish points → last-match placement (configurable, and
+worth confirming against your event's rulebook). Exports:
+`/api/admin/export/standings.csv` and `/api/admin/export/match/<id>.csv`.
 
 ## Tests
 

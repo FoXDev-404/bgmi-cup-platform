@@ -50,10 +50,34 @@ Requested follow-ups after the merge dry run. Safety: demo/seed DB only (backup 
        refusal, PTS math, reset, undo), test_api 104, test_admin 94, Playwright 8/8,
        plus an interactive desk dry run on the demo DB (finish, adjust, swap with a real
        sub, placement conflict badge, AUTO, undo ×N — all clean, state restored).
-- [ ] R2-4. BGMI points table, configurable — **Not started**
-       default 10/6/5/4/3/2/1/1 + 1/finish + manual adjustments (reason + audit); tie-breakers
-       points → wins → placement pts → finish pts → last-match placement (configurable);
-       settings page confirm note; one engine for /live, /results, overlays, CSV; unit tests.
+- [x] R2-4. BGMI points table, configurable — **Done**
+       default 10/6/5/4/3/2/1/1 (9th+ = 0) + 1/finish + manual adjustments
+       (reason + audit, from R2-3); the table stays admin-editable on
+       `/admin/matches` with an audit row per change.
+       Tie-breakers are now configurable (ordered chips on the matches page,
+       add/remove/move): applied after total points, default wins (1st places) →
+       placement points → finish points → last-match placement. Stored in
+       `scoring_rules` (`tiebreakers` key), validated server-side, empty list
+       refused; rows carry `finishPoints` for the table + CSV.
+       Fixed while wiring it: `overall_sort_key` read snake_case keys while the
+       standings builder emits camelCase, so the placement/finish/last-placement
+       breakers were dead at the table level — both spellings are read now, and
+       the dead tie genuinely resolves on last-match placement (regression test
+       on an in-memory DB).
+       Also fixed: `publish_match` re-scored without the manual adjustment.
+       One engine: `/live`, `/results`, the overview tables, the overlays and the
+       two new CSV exports (`/api/admin/export/standings.csv`,
+       `/api/admin/export/match/<id>.csv` — last one carries adjustment + reason)
+       all read the same engine; standings CSV is admin-gated and logged.
+       Settings notes: the matches page says to confirm the table against the
+       rulebook and that changing it re-scores live matches and every table;
+       lobbies stay any-size (placements 1..#squads, publish still gated on
+       every squad having a unique placement).
+       Verified: test_broadcast 139/139 (20 new: all 16 placements, finishes,
+       adjustment math + floor, default + custom tie-breaker orders, multi-match
+       totals, CSV shape + gating), test_api 104, test_admin 94, Playwright 8/8,
+       plus a matches-page UI dry run (chips load, reorder saves round-trip,
+       empty list refused — state restored).
 - [ ] R2-5. Dry run + screenshots + report — **Not started**
 
 Verified by running (2026-10-15): `python tests/test_api.py` (104 ✓), `python tests/test_admin.py` (94 ✓),

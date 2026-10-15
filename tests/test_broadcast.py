@@ -86,6 +86,16 @@ def j(method, path, body=None, headers=None):
                    ctype="application/json")
 
 
+def fetch_text(path, headers=None):
+    """Raw GET for CSV exports (utf-8-sig tolerant)."""
+    req = urllib.request.Request(T.BASE + path, headers=headers or {})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status, r.read().decode("utf-8-sig")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode("utf-8-sig", "replace")
+
+
 def no_pii(text):
     """True when no e-mail / phone / cap_* key appears in the payload."""
     return not any(rx.search(text) for rx in PII_PROBES)
@@ -156,10 +166,11 @@ def main():
     report("compute_points: 9th+ place earns no placement points",
            broadcast.compute_points(2, 9, rules) == 2)
 
-    # tie-breakers, in spec order: points > wins > placement pts > kills > last
-    row = lambda pts, wins, pp, kills, last: {   # noqa: E731
+    # tie-breakers, in spec order: points > wins > placement pts >
+    # finish pts > last-match placement
+    row = lambda pts, wins, pp, fp, last: {   # noqa: E731
         "points": pts, "wins": wins, "placement_points": pp,
-        "kills": kills, "last_placement": last}
+        "finish_points": fp, "last_placement": last}
     base = row(20, 1, 10, 6, 3)
     report("tie-break: more points wins",
            sorted([base, row(21, 0, 8, 9, 8)], key=broadcast.overall_sort_key)
@@ -170,9 +181,9 @@ def main():
     report("tie-break: equal points+ wins -> placement points",
            sorted([base, row(20, 1, 12, 1, 9)], key=broadcast.overall_sort_key)
            [0]["placement_points"] == 12)
-    report("tie-break: then kills",
+    report("tie-break: then finish points",
            sorted([base, row(20, 1, 10, 8, 9)], key=broadcast.overall_sort_key)
-           [0]["kills"] == 8)
+           [0]["finish_points"] == 8)
     report("tie-break: then last-match placement (earlier better)",
            sorted([base, row(20, 1, 10, 6, 1)], key=broadcast.overall_sort_key)
            [0]["last_placement"] == 1)
@@ -734,6 +745,146 @@ def main():
     j("POST", "/api/admin/scoring-rules", {"kill_points": 1,
                                            "placement": {}}, headers=T.ah())
     report("scoring rules restored to defaults", True)
+
+    # ---------- R2-4: points table + configurable tie-breakers ----------
+    print("\n[R2-4 points + tie-breakers]")
+    default_placement = {"1": {"points": 10}, "2": {"points": 6},
+                         "3": {"points": 5}, "4": {"points": 4},
+                         "5": {"points": 3}, "6": {"points": 2},
+                         "7": {"points": 1}, "8": {"points": 1}}
+    j("POST", "/api/admin/scoring-rules",
+      {"kill_points": 1, "placement": default_placement,
+       "tiebreakers": ["wins", "placement_points", "finish_points",
+                       "last_placement"]}, headers=T.ah())
+    with server_conn() as conn:
+        live_rules = broadcast.load_rules(conn)
+    base_table = {1: 10, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 1}
+    bad = ["P%d=%s" % (p, broadcast.compute_points(0, p, live_rules))
+           for p in range(1, 17)
+           if broadcast.compute_points(0, p, live_rules) != base_table.get(p, 0)]
+    report("all 16 placements score 10/6/5/4/3/2/1/1 then 0",
+           not bad, ", ".join(bad) or "P1-P16 ok")
+    report("finishes score one point each by default",
+           broadcast.compute_points(5, 0, live_rules) == 5)
+    report("match points = placement + finishes + adjustment",
+           broadcast.compute_points(3, 1, live_rules, 2) == 15)
+    report("a negative adjustment floors at zero",
+           broadcast.compute_points(0, 9, live_rules, -5) == 0)
+    report("default tie-breaker order is wins > placement > finish > last",
+           live_rules["tiebreakers"] == ["wins", "placement_points",
+                                         "finish_points", "last_placement"],
+           str(live_rules["tiebreakers"]))
+
+    base_row = {"points": 20, "wins": 0, "placement_points": 10,
+                "finish_points": 6, "last_placement": 5}
+
+    def ranks_higher(changes):
+        a = dict(base_row)
+        b = dict(base_row)
+        b.update(changes)
+        return sorted([a, b], key=broadcast.overall_sort_key)[0] is b
+
+    report("tie-breaker: number of 1st places", ranks_higher({"wins": 1}))
+    report("tie-breaker: total placement points",
+           ranks_higher({"placement_points": 12}))
+    report("tie-breaker: total finish points",
+           ranks_higher({"finish_points": 9}))
+    report("tie-breaker: last-match placement",
+           ranks_higher({"last_placement": 2}))
+    c = dict(base_row, finish_points=12, placement_points=8)
+    b = dict(base_row, finish_points=9)
+    first = sorted([b, c], key=lambda r: broadcast.overall_sort_key(
+        r, ["finish_points", "placement_points"]))[0]
+    report("custom tie-breaker order is honoured", first is c,
+           "finish_points=%s" % first["finish_points"])
+
+    # multi-match totals through the same engine (isolated in-memory DB)
+    mem = sqlite3.connect(":memory:")
+    mem.row_factory = sqlite3.Row
+    mem.executescript(broadcast.SCHEMA)
+    mem.executescript(
+        "CREATE TABLE registrations (team_id TEXT PRIMARY KEY, "
+        "team_name TEXT NOT NULL, team_tag TEXT NOT NULL, "
+        "logo_path TEXT, group_id INTEGER);"
+        "CREATE TABLE groups (id INTEGER PRIMARY KEY, name TEXT);")
+    mem.execute("INSERT INTO registrations (team_id, team_name, team_tag) "
+                "VALUES ('QA-A', 'Alpha QA', 'QA-A')")
+    mem.execute("INSERT INTO registrations (team_id, team_name, team_tag) "
+                "VALUES ('QA-B', 'Bravo QA', 'QA-B')")
+    broadcast.migrate(mem)
+    for n in (1, 2):
+        mem.execute("INSERT INTO matches (match_number, group_name, map, "
+                    "status, created_at) VALUES (?, 'QA', 'Erangel', "
+                    "'published', ?)", (n, broadcast.now_iso()))
+    for row in ((1, "QA-A", 1, 3, 13), (1, "QA-B", 2, 4, 10),
+                (2, "QA-A", 2, 1, 7), (2, "QA-B", 1, 0, 10)):
+        mem.execute("INSERT INTO match_team_results (match_id, team_id, "
+                    "placement, kills, adjustment, points) VALUES "
+                    "(?, ?, ?, ?, 0, ?)", row)
+    mem.commit()
+    qa = broadcast.standings_rows(mem, None, include_live=False)
+    by_id = {r["teamId"]: r for r in qa}
+    order = [r["teamId"] for r in qa]
+    report("multi-match totals sum through one engine",
+           by_id["QA-A"]["points"] == 20 and by_id["QA-B"]["points"] == 20
+           and by_id["QA-A"]["matches"] == 2 and by_id["QA-A"]["wins"] == 1
+           and by_id["QA-B"]["wins"] == 1,
+           str({k: (by_id[k]["points"], by_id[k]["matches"])
+                for k in ("QA-A", "QA-B")}))
+    report("placement + finish points feed the tie-breakers",
+           by_id["QA-A"]["placementPoints"] == 16
+           and by_id["QA-A"]["finishPoints"] == 4
+           and by_id["QA-A"]["lastPlacement"] == 2,
+           "pp=%s fp=%s last=%s" % (by_id["QA-A"]["placementPoints"],
+                                    by_id["QA-A"]["finishPoints"],
+                                    by_id["QA-A"]["lastPlacement"]))
+    report("a dead tie resolves on last-match placement",
+           order.index("QA-B") < order.index("QA-A"), "order=%s" % order)
+    mem.close()
+
+    # API round-trip, audit and the CSV exports
+    st, d = j("POST", "/api/admin/scoring-rules",
+              {"kill_points": 2, "placement": {},
+               "tiebreakers": ["finish_points", "last_placement"]},
+              headers=T.ah())
+    report("tie-breakers + table save round-trips",
+           st == 200 and d["rules"]["tiebreakers"] == ["finish_points",
+                                                       "last_placement"]
+           and d["rules"]["kill_points"] == 2, str(d)[:160])
+    report("changed table re-scores through the engine",
+           broadcast.compute_points(5, 0, d["rules"]) == 10)
+    st, d = j("POST", "/api/admin/scoring-rules",
+              {"kill_points": 1, "placement": {}, "tiebreakers": []},
+              headers=T.ah())
+    report("an empty tie-breaker list is refused",
+           st == 400 and "tie-breaker" in json.dumps(d).lower(), str(d)[:160])
+    st, d = j("GET", "/api/admin/audit", headers=T.ah())
+    report("scoring-rule changes are audited",
+           st == 200 and "scoring_rules" in json.dumps(d), str(d)[:120])
+    j("POST", "/api/admin/scoring-rules",
+      {"kill_points": 1, "placement": default_placement,
+       "tiebreakers": ["wins", "placement_points", "finish_points",
+                       "last_placement"]}, headers=T.ah())
+
+    st, csv_text = fetch_text("/api/admin/export/standings.csv", T.ah())
+    head = csv_text.splitlines()[0] if csv_text else ""
+    report("standings CSV uses the engine's table",
+           st == 200 and head.startswith("rank,team_id")
+           and "tie_breakers" in head and len(csv_text.splitlines()) >= 3,
+           "status=%s head=%s" % (st, head[:90]))
+    st, _auth = fetch_text("/api/admin/export/standings.csv")
+    report("standings CSV is admin-gated", st in (401, 403), "status=%s" % st)
+    st, d = j("GET", "/api/admin/matches", headers=T.ah())
+    published = [m for m in d.get("matches", [])
+                 if m["status"] == "published"]
+    st, csv_text = fetch_text(
+        "/api/admin/export/match/%d.csv" % published[0]["id"], T.ah())
+    head = csv_text.splitlines()[0] if csv_text else ""
+    report("match CSV carries placement, finishes and adjustment",
+           st == 200 and head.startswith("placement,team_id")
+           and "adjustment_reason" in head
+           and len(csv_text.splitlines()) == published[0]["team_count"] + 1,
+           "status=%s head=%s" % (st, head[:90]))
 
     # ---------- pushed stat card (caster desk, kept server-side) ----------
     print("\n[caster push]")

@@ -498,6 +498,20 @@
   font-size: .78rem; color: var(--beige-dim); }
 .bc-pl b { color: var(--ink); }
 
+/* ---- tie-breaker chips (matches page) ----------------------------------- */
+
+.bc-tb-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.bc-tb {
+  display: inline-flex; align-items: center; gap: 3px;
+  border: 1px solid var(--line-strong); border-radius: 3px;
+  padding: 3px 7px; font-family: var(--font-mono); font-size: .7rem;
+}
+.bc-tb-x {
+  border: 0; background: transparent; color: var(--beige-dim);
+  cursor: pointer; font-size: .72rem; line-height: 1; padding: 0 1px;
+}
+.bc-tb-x:hover { color: var(--acid); }
+
 /* ---- reduced motion ----------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }

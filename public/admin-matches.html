@@ -13,7 +13,7 @@
 
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/admin.css?v=5">
-  <link rel="stylesheet" href="/css/control.css?v=1">
+  <link rel="stylesheet" href="/css/control.css?v=2">
   <link rel="stylesheet" href="/css/footer.css?v=1">
 </head>
 <body>
@@ -82,17 +82,36 @@
     <!-- scoring rules -->
     <section class="bc-card">
       <h2 class="bc-h2">Scoring rules</h2>
-      <p class="bc-p">Placement points per finishing position, plus points per frag. Live matches re-score instantly.</p>
+      <p class="bc-p">Placement points per finishing position plus points per finish. 9th place and below score 0, a lobby can hold any number of squads (16 by default), and live matches re-score instantly.</p>
       <form id="rulesForm">
         <div class="bc-form-row">
           <div>
-            <label class="bc-label" for="killPoints">Points / frag</label>
+            <label class="bc-label" for="killPoints">Points per finish</label>
             <input class="bc-input bc-input--mini" id="killPoints" type="number" min="0" max="10">
           </div>
         </div>
         <div class="bc-form-row" id="placementRow"></div>
+        <label class="bc-label" style="margin-top:8px;">Overall tie-breakers
+          <span class="bc-dim">(applied in order after total points)</span></label>
+        <div class="bc-tb-row" id="tbRow"></div>
+        <div class="bc-form-row">
+          <div>
+            <label class="bc-label" for="tbAdd">Add a tie-breaker</label>
+            <select class="bc-select" id="tbAdd">
+              <option value="wins">Number of 1st places</option>
+              <option value="placement_points">Total placement points</option>
+              <option value="finish_points">Total finish points</option>
+              <option value="last_placement">Last-match placement</option>
+            </select>
+          </div>
+          <button class="bc-btn" type="button" id="tbAddBtn">Add</button>
+        </div>
         <button class="bc-btn bc-btn--go" type="submit">Save rules</button>
       </form>
+      <p class="bc-p bc-dim" style="margin-top:10px;">Confirm this table against your event&rsquo;s rulebook before the first match &mdash; the match desk, <code>/live</code>, <code>/results</code>, the overlays and the CSV exports all score from it. Changing a value re-scores live matches and refreshes every table.</p>
+      <div class="bc-form-row">
+        <a class="bc-btn" href="/api/admin/export/standings.csv">Download standings CSV</a>
+      </div>
       <div class="bc-notice hidden" id="rulesNotice" role="status"></div>
     </section>
 
@@ -158,6 +177,6 @@
 
   <script src="/js/nav.js?v=1"></script>
   <script src="/js/admin-shell.js?v=1"></script>
-  <script src="/js/matches.js?v=1"></script>
+  <script src="/js/matches.js?v=2"></script>
 </body>
 </html>

@@ -28,6 +28,8 @@
     if (m.status !== 'published') {
       acts.push('<button class="bc-btn bc-btn--no" data-del="' + m.id + '">Delete</button>');
     }
+    acts.push('<a class="bc-btn" href="/api/admin/export/match/' + m.id +
+      '.csv" title="Download this match\'s results CSV">CSV</a>');
     return '<article class="bc-match">' +
       '<div class="bc-match-n">Match ' + m.match_number + '</div>' +
       '<div class="bc-match-meta">Group ' + esc(m.group_name) + ' &middot; ' +
@@ -133,6 +135,60 @@
 
   /* ---- scoring rules ---------------------------------------------------- */
 
+  var TIE_LABELS = {
+    'wins': '1st places',
+    'placement_points': 'placement points',
+    'finish_points': 'finish points',
+    'last_placement': 'last-match placement'
+  };
+  var tiebreakers = [];
+
+  function renderTiebreakers() {
+    var row = $('tbRow');
+    row.innerHTML = tiebreakers.map(function (k, i) {
+      var label = esc(TIE_LABELS[k] || k);
+      return '<span class="bc-tb">' + (i + 1) + '. ' + label +
+        '<button type="button" class="bc-tb-x" data-tb="' + k +
+        '" data-move="up" title="Move up" aria-label="Move ' + label +
+        ' up">&uarr;</button>' +
+        '<button type="button" class="bc-tb-x" data-tb="' + k +
+        '" data-move="down" title="Move down" aria-label="Move ' + label +
+        ' down">&darr;</button>' +
+        '<button type="button" class="bc-tb-x" data-tb="' + k +
+        '" data-move="remove" title="Remove" aria-label="Remove ' + label +
+        '">&times;</button></span>';
+    }).join('') ||
+      '<span class="bc-dim">No tie-breakers yet &mdash; add at least one.</span>';
+  }
+
+  $('tbRow').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-move]');
+    if (!b) return;
+    var k = b.dataset.tb;
+    var i = tiebreakers.indexOf(k);
+    if (i < 0) return;
+    if (b.dataset.move === 'up' && i > 0) {
+      tiebreakers.splice(i, 1);
+      tiebreakers.splice(i - 1, 0, k);
+    } else if (b.dataset.move === 'down' && i < tiebreakers.length - 1) {
+      tiebreakers.splice(i, 1);
+      tiebreakers.splice(i + 1, 0, k);
+    } else if (b.dataset.move === 'remove') {
+      tiebreakers.splice(i, 1);
+    }
+    renderTiebreakers();
+  });
+
+  $('tbAddBtn').addEventListener('click', function () {
+    var k = $('tbAdd').value;
+    if (tiebreakers.indexOf(k) >= 0) {
+      BC.toast('That tie-breaker is already in the list.', true);
+      return;
+    }
+    tiebreakers.push(k);
+    renderTiebreakers();
+  });
+
   function loadRules() {
     BC.api('/api/admin/scoring-rules').then(function (x) {
       if (x.s !== 200 || !x.d.ok) return;
@@ -146,23 +202,31 @@
           'data-pos="' + p + '" value="' + x.d.rules.placement[p] + '">';
         row.appendChild(div);
       }
+      tiebreakers = (x.d.rules.tiebreakers || []).slice();
+      renderTiebreakers();
     });
   }
 
   $('rulesForm').addEventListener('submit', function (e) {
     e.preventDefault();
+    if (!tiebreakers.length) {
+      BC.toast('Keep at least one tie-breaker.', true);
+      return;
+    }
     var placement = {};
     $('placementRow').querySelectorAll('input').forEach(function (inp) {
       placement[inp.dataset.pos] = { points: parseInt(inp.value, 10) || 0 };
     });
     BC.post('/api/admin/scoring-rules', {
       kill_points: parseInt($('killPoints').value, 10) || 0,
-      placement: placement
+      placement: placement,
+      tiebreakers: tiebreakers
     }).then(function (x) {
       if (x.s === 200 && x.d.ok) {
         BC.toast('Scoring rules saved');
         var note = $('rulesNotice');
-        note.textContent = 'Saved — live matches re-score instantly.';
+        note.textContent = 'Saved — live matches re-score and every table ' +
+          '(desk, /live, /results, overlays, CSV) follows the new rules.';
         note.className = 'bc-notice bc-notice--ok';
       } else {
         BC.toast(x.d.error || 'Save failed', true);

@@ -54,10 +54,20 @@ DEFAULT_OVERLAY_SETTINGS = {
     "broadcast_scene": "live",   # fallback scene for an unpinned overlay page
 }
 
+# Overall-table tie-breakers, applied in order after total points.
+# Configurable on /admin/matches; the default follows the BGMI brief:
+# total points -> number of 1st places -> total placement points ->
+# total finish points -> last-match placement.
+TIEBREAKER_KEYS = ("wins", "placement_points", "finish_points",
+                   "last_placement")
+DEFAULT_TIEBREAKERS = ("wins", "placement_points", "finish_points",
+                       "last_placement")
+
 DEFAULT_SCORING_RULES = dict(
     [("kill_points", str(DEFAULT_KILL_POINT))] +
     [("placement_%d" % p, str(pts))
-     for p, pts in DEFAULT_PLACEMENT_POINTS.items()])
+     for p, pts in DEFAULT_PLACEMENT_POINTS.items()] +
+    [("tiebreakers", ",".join(DEFAULT_TIEBREAKERS))])
 
 
 def now_iso():
@@ -275,7 +285,15 @@ def load_rules(conn):
         placement[pos] = _clamp_int(
             get_rule(conn, "placement_%d" % pos,
                      str(DEFAULT_PLACEMENT_POINTS[pos])), 0, 100)
-    return {"kill_points": kill, "placement": placement}
+    picked = []
+    for key in str(get_rule(conn, "tiebreakers", "")).split(","):
+        key = key.strip()
+        if key in TIEBREAKER_KEYS and key not in picked:
+            picked.append(key)
+    if not picked:
+        picked = list(DEFAULT_TIEBREAKERS)
+    return {"kill_points": kill, "placement": placement,
+            "tiebreakers": picked}
 
 
 def save_rules(conn, data):
@@ -288,6 +306,18 @@ def save_rules(conn, data):
             raw = (data.get("placement") or {}).get(str(pos))
         val = _clamp_int(raw, 0, 100)
         set_rule(conn, "placement_%d" % pos, str(val))
+    if "tiebreakers" in data:
+        raw = data.get("tiebreakers")
+        if isinstance(raw, str):
+            raw = raw.split(",")
+        picked = []
+        for key in (raw or []):
+            key = str(key).strip()
+            if key in TIEBREAKER_KEYS and key not in picked:
+                picked.append(key)
+        if not picked:
+            raise ValueError("Pick at least one tie-breaker.")
+        set_rule(conn, "tiebreakers", ",".join(picked))
 
 
 # ---------------------------------------------------------------------------
@@ -402,15 +432,30 @@ def sync_auto_placements(teams, sequence):
     return sequence
 
 
-def overall_sort_key(row):
-    """Tie-breakers (spec): total points, wins, placement points, kills,
-    then last-match placement (earlier is better; missing = worst)."""
-    last = row.get("last_placement")
-    return (-int(row.get("points") or 0),
-            -int(row.get("wins") or 0),
-            -int(row.get("placement_points") or 0),
-            -int(row.get("kills") or 0),
-            int(last) if last else 10 ** 6)
+def overall_sort_key(row, tiebreakers=None):
+    """Overall table order: total points first, then the configured
+    tie-breakers in order (default: wins, placement points, finish points,
+    last-match placement — earlier place is better, missing = worst).
+    Rows come in two shapes: snake_case (unit tests) and the standings
+    builders' camelCase, so both key spellings are read."""
+    def num(*names):
+        for n in names:
+            if n in row and row[n] is not None:
+                return int(row[n] or 0)
+        return 0
+
+    key = [-num("points")]
+    for tb in (tiebreakers or DEFAULT_TIEBREAKERS):
+        if tb == "last_placement":
+            last = row.get("last_placement", row.get("lastPlacement"))
+            key.append(int(last) if last else 10 ** 6)
+        elif tb == "finish_points":
+            key.append(-num("finish_points", "finishPoints"))
+        elif tb == "placement_points":
+            key.append(-num("placement_points", "placementPoints"))
+        else:
+            key.append(-num(tb))
+    return tuple(key)
 
 
 # ---------------------------------------------------------------------------
@@ -582,7 +627,8 @@ def publish_match(conn, match_id, who=""):
     rules = load_rules(conn)
     for r in conn.execute("SELECT * FROM match_team_results "
                           "WHERE match_id = ?", (int(match_id),)):
-        pts = compute_points(r["kills"], r["placement"], rules)
+        pts = compute_points(r["kills"], r["placement"], rules,
+                             r["adjustment"])
         conn.execute("UPDATE match_team_results SET points = ? "
                      "WHERE match_id = ? AND team_id = ?",
                      (pts, int(match_id), r["team_id"]))
@@ -1175,13 +1221,15 @@ def standings_rows(conn, group_name=None, include_live=False):
     for r in conn.execute(q, args):
         t = totals.setdefault(r["team_id"], {
             "points": 0, "kills": 0, "matches": 0, "wins": 0,
-            "placement_points": 0, "last_placement": None})
+            "placement_points": 0, "finish_points": 0,
+            "last_placement": None})
         t["points"] += int(r["points"] or 0)
         t["kills"] += int(r["kills"] or 0)
         t["matches"] += 1
         if int(r["placement"] or 0) == 1:
             t["wins"] += 1
         t["placement_points"] += placement_points(r["placement"], rules)
+        t["finish_points"] += int(r["kills"] or 0) * int(rules["kill_points"])
         t["last_placement"] = int(r["placement"]) if r["placement"] else None
     rows = []
     for team_id, t in totals.items():
@@ -1191,8 +1239,9 @@ def standings_rows(conn, group_name=None, include_live=False):
         rows.append(dict(pub, points=t["points"], kills=t["kills"],
                          matches=t["matches"], wins=t["wins"],
                          placementPoints=t["placement_points"],
+                         finishPoints=t["finish_points"],
                          lastPlacement=t["last_placement"]))
-    rows.sort(key=overall_sort_key)
+    rows.sort(key=lambda r: overall_sort_key(r, rules["tiebreakers"]))
     for i, row in enumerate(rows, 1):
         row["rank"] = i
     return rows
@@ -1365,7 +1414,7 @@ LEGACY_STATUS = {"alive": "alive", "knocked": "knocked", "out": "eliminated"}
 
 
 def _row_adjustment(row):
-    """Manual adjustment points (R2-4 column; 0 until it exists)."""
+    """Manual adjustment points (matches stored before R2-3 had none)."""
     try:
         return int(row["adjustment"] or 0)
     except (IndexError, KeyError):

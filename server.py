@@ -25,6 +25,7 @@ import hashlib
 import hmac
 import json
 import os
+import queue
 import random
 import re
 import secrets
@@ -35,6 +36,8 @@ import zlib
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
+
+import broadcast
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -528,6 +531,9 @@ def init_db():
             for k, v in DEFAULT_SETTINGS.items():
                 conn.execute("INSERT OR IGNORE INTO settings (key, value) "
                              "VALUES (?, ?)", (k, v))
+            # broadcast tables (matches, results, player stats, events,
+            # scoring rules, overlay settings) — additive, never destructive
+            broadcast.migrate(conn)
             # backfill: rows without a public code predate the workflow —
             # they were accepted under the old first-come rule → approved
             for r in conn.execute(
@@ -1314,6 +1320,81 @@ class Handler(BaseHTTPRequestHandler):
         if not self._head_only:
             self.wfile.write(body)
 
+    def redirect(self, location, status=302):
+        self.drain_body()
+        self.send_response(status)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    # ---- server-sent events ------------------------------------------------
+
+    SSE_KEEPALIVE = 15          # seconds between ": ping" comments
+
+    def sse_stream(self, topic):
+        """Stream broadcast.HUB events on `topic` as SSE.
+
+        One connection per page; the client refetches its state endpoint on
+        every event (the event itself is only a change signal). Cleaned up on
+        any write failure so closed tabs never leak threads."""
+        self.close_connection = True
+        _, token, q = broadcast.HUB.subscribe(topic)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            if self._head_only:
+                return
+            self.wfile.write(b": connected\n\n")
+            self.wfile.flush()
+            while True:
+                try:
+                    payload = q.get(timeout=self.SSE_KEEPALIVE)
+                except queue.Empty:
+                    self.wfile.write(b": ping\n\n")
+                    self.wfile.flush()
+                    continue
+                data = json.dumps(payload).encode("utf-8")
+                self.wfile.write(b"data: " + data + b"\n\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, TimeoutError, OSError):
+            pass
+        finally:
+            broadcast.HUB.unsubscribe(topic, token)
+
+    # ---- overlay data (token gated) ----------------------------------------
+
+    def overlay_api(self, path, qs):
+        name = path.split("/api/overlay/", 1)[1]
+        kind, _, name = name.partition("/")
+        name = name.rstrip("/").lower()
+        token = (qs.get("token", [""])[0] or "")
+        state = None
+        with DB_LOCK:
+            conn = db()
+            try:
+                allowed = broadcast.check_overlay_token(conn, token)
+                if allowed and kind == "state":
+                    state = broadcast.overlay_state(conn, name)
+            finally:
+                conn.close()
+        if not allowed:
+            return self.send_json(
+                {"ok": False, "error": "Invalid overlay token."}, 403)
+        if name not in broadcast.OVERLAY_NAMES:
+            return self.send_json({"ok": False, "error": "Unknown overlay."},
+                                  404)
+        if kind == "state":
+            if state is None:
+                return self.send_json({"ok": False, "error": "Unknown overlay."},
+                                      404)
+            return self.send_json(state)
+        if kind == "stream":
+            return self.sse_stream("overlay")
+        return self.send_json({"ok": False, "error": "Not found."}, 404)
+
     def serve_static(self, rel):
         rel = unquote(rel).lstrip("/")
         if rel in ("", "/"):
@@ -1395,6 +1476,24 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/csrf":
             return self.send_json({"token": issue_csrf(self.client_ip())})
 
+        # ---- live broadcast (public, PII-free) ----
+        if path == "/api/live/state":
+            with DB_LOCK:
+                conn = db()
+                try:
+                    payload = broadcast.live_state(conn)
+                finally:
+                    conn.close()
+            return self.send_json(payload)
+
+        if path == "/api/live/stream":
+            return self.sse_stream("live")
+
+        # ---- overlays (token gated; no session, no PII) ----
+        if path.startswith("/api/overlay/state/") or \
+                path.startswith("/api/overlay/stream/"):
+            return self.overlay_api(path, qs)
+
         # ---- public integration feed (serves overlays/match tools later) ----
         if path == "/api/public/approved":
             with DB_LOCK:
@@ -1444,11 +1543,39 @@ class Handler(BaseHTTPRequestHandler):
                 return self.serve_static("/admin.html")
             return self.serve_static("/admin-login.html")
 
+        # broadcast admin pages — same session gate as the Control Room
+        if path.startswith("/admin/"):
+            sub = path[len("/admin/"):].rstrip("/").lower()
+            page = {"matches": "admin-matches.html",
+                    "control": "admin-control.html",
+                    "overlays": "admin-overlays.html",
+                    "caster": "admin-caster.html"}.get(sub)
+            if page:
+                if self.admin_session():
+                    return self.serve_static("/" + page)
+                return self.serve_static("/admin-login.html")
+
         if path in ("/status", "/status.html"):
             return self.serve_static("/status.html")
 
         if path in ("/teams", "/teams.html"):
             return self.serve_static("/teams.html")
+
+        # legacy URLs from the old broadcast app keep working
+        if path in ("/standings", "/standings.html"):
+            return self.redirect("/results")
+        if path in ("/operator", "/operator.html"):
+            return self.redirect("/admin/control")
+        if path in ("/login", "/login.html"):
+            return self.redirect("/admin")
+
+        # OBS overlay pages: /overlay/<name> serves the single overlay shell
+        if path.startswith("/overlay/") or path == "/overlay":
+            name = path[len("/overlay/"):].rstrip("/").lower()
+            if path == "/overlay" or name not in broadcast.OVERLAY_NAMES:
+                # bare /overlay or an unknown name: producer page explains them
+                return self.redirect("/admin/overlays")
+            return self.serve_static("/overlay.html")
 
         return self.serve_static(path)
 
@@ -1474,6 +1601,67 @@ class Handler(BaseHTTPRequestHandler):
             return self.admin_groups()
         if rest == "notifications":
             return self.admin_notifications()
+
+        # ---- broadcast admin reads ----
+        if rest == "matches":
+            with DB_LOCK:
+                conn = db()
+                try:
+                    matches = broadcast.list_matches(conn)
+                    groups = [dict(r) for r in conn.execute(
+                        "SELECT id, name FROM groups ORDER BY name")]
+                finally:
+                    conn.close()
+            return self.send_json({"ok": True, "matches": matches,
+                                   "groups": groups})
+        m = re.match(r"^matches/(\d+)$", rest)
+        if m:
+            with DB_LOCK:
+                conn = db()
+                try:
+                    state = broadcast.match_state(conn, int(m.group(1)))
+                    eligible = broadcast.eligible_teams(
+                        conn, state["match"]["group_name"]) if state else []
+                finally:
+                    conn.close()
+            if not state:
+                return self.send_json({"ok": False, "error": "Not found."},
+                                      404)
+            return self.send_json({"ok": True, "state": state,
+                                   "eligible": eligible})
+        if rest == "overlay-settings":
+            with DB_LOCK:
+                conn = db()
+                try:
+                    pairs = {r["key"]: r["value"] for r in conn.execute(
+                        "SELECT key, value FROM overlay_settings")}
+                finally:
+                    conn.close()
+            try:
+                pushed = json.loads(pairs.get("pushed_card") or "null")
+            except ValueError:
+                pushed = None
+            return self.send_json({
+                "ok": True,
+                "token": pairs.get("token", ""),
+                "themeColor": pairs.get("theme_color", "#b6ff3e"),
+                "logoPath": pairs.get("logo_path", ""),
+                "sponsorText": pairs.get("sponsor_text", ""),
+                "introTeam": pairs.get("intro_team", ""),
+                "pushedCard": pushed,
+                "overlays": list(broadcast.OVERLAY_NAMES)})
+        if rest == "scoring-rules":
+            with DB_LOCK:
+                conn = db()
+                try:
+                    rules = broadcast.load_rules(conn)
+                finally:
+                    conn.close()
+            return self.send_json({"ok": True, "rules": rules})
+        if rest == "stream":
+            return self.sse_stream("admin")
+        if rest.startswith("matches/") and rest.endswith("/stream"):
+            return self.sse_stream("admin")
         if rest == "settings":
             with DB_LOCK:
                 conn = db()
@@ -2058,15 +2246,25 @@ class Handler(BaseHTTPRequestHandler):
                     logos = [r["logo_path"] for r in conn.execute(
                         "SELECT logo_path FROM registrations "
                         "WHERE logo_path IS NOT NULL")]
+                    # broadcast data references registrations via FK cascade,
+                    # but clear explicitly first so nothing is left behind
+                    conn.execute("DELETE FROM event_log")
+                    conn.execute("DELETE FROM player_stats")
+                    conn.execute("DELETE FROM match_team_results")
+                    conn.execute("DELETE FROM matches")
+                    conn.execute("DELETE FROM overlay_settings")
                     conn.execute("DELETE FROM change_requests")
                     conn.execute("DELETE FROM roster_members")
                     conn.execute("DELETE FROM registrations")
                     conn.execute("DELETE FROM groups")
                     audit(conn, who, None, "purge_all",
                           old="%d teams" % n, new="0")
+                    # re-seed overlay defaults with a fresh token
+                    broadcast.reseed_settings(conn)
                     conn.commit()
                 finally:
                     conn.close()
+            broadcast.publish_update()
             for lp in logos:
                 target = os.path.join(UPLOAD_DIR, os.path.basename(lp))
                 for attempt in range(3):
@@ -2078,6 +2276,235 @@ class Handler(BaseHTTPRequestHandler):
                     except OSError:
                         break
             return self.send_json({"ok": True, "removed": n})
+
+        # ---- broadcast admin writes ----
+        if rest == "matches":
+            try:
+                with DB_LOCK:
+                    conn = db()
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                        match = broadcast.create_match(
+                            conn, data.get("group"), data.get("map", "Erangel"),
+                            data.get("notes", ""), who)
+                        if data.get("teamIds") is not None:
+                            broadcast.set_lineup(conn, match["id"],
+                                                 data.get("teamIds"))
+                        audit(conn, who, None, "match_create",
+                              new="match %d" % match["match_number"])
+                        conn.commit()
+                        state = broadcast.match_state(conn, match["id"])
+                    except Exception:
+                        conn.rollback()
+                        raise
+                    finally:
+                        conn.close()
+            except ValueError as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+            broadcast.publish_update()
+            return self.send_json({"ok": True, "state": state})
+
+        m = re.match(r"^matches/(\d+)(?:/(checkin|status|publish|unpublish|reset))?$",
+                     rest)
+        if m:
+            mid = int(m.group(1))
+            action = m.group(2)
+            try:
+                with DB_LOCK:
+                    conn = db()
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                        if action is None and data.get("delete"):
+                            match = broadcast.get_match(conn, mid)
+                            broadcast.delete_match(conn, mid, who)
+                            audit(conn, who, None, "match_delete",
+                                  old="match %s" %
+                                  (match["match_number"] if match else mid))
+                        elif action == "checkin":
+                            broadcast.set_lineup(conn, mid,
+                                                 data.get("teamIds") or [])
+                            audit(conn, who, None, "match_checkin",
+                                  new="%d squads" %
+                                  len(data.get("teamIds") or []))
+                        elif action == "status":
+                            status = data.get("status")
+                            if status == "live":
+                                broadcast.start_match(conn, mid, who)
+                            elif status == "awaiting_verification":
+                                broadcast.end_match(conn, mid, who)
+                            else:
+                                raise ValueError("Unknown status change.")
+                            audit(conn, who, None, "match_status", new=status)
+                        elif action == "publish":
+                            broadcast.publish_match(conn, mid, who)
+                            audit(conn, who, None, "match_publish")
+                        elif action == "unpublish":
+                            broadcast.unpublish_match(conn, mid, who)
+                            audit(conn, who, None, "match_unpublish")
+                        elif action == "reset":
+                            broadcast.reset_match(conn, mid, who)
+                            audit(conn, who, None, "match_reset")
+                        else:
+                            raise ValueError("Unknown match action.")
+                        conn.commit()
+                        state = broadcast.match_state(conn, mid)
+                        matches = broadcast.list_matches(conn)
+                    except Exception:
+                        conn.rollback()
+                        raise
+                    finally:
+                        conn.close()
+            except ValueError as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+            broadcast.publish_update()
+            return self.send_json({"ok": True, "state": state,
+                                   "matches": matches})
+
+        # ---- live desk actions ----
+        m = re.match(r"^match/(\d+)/team/([^/]+)"
+                     r"(?:/(kills|eliminate|placement))?$", rest)
+        if m:
+            mid, tid, action = int(m.group(1)), m.group(2), m.group(3)
+            try:
+                with DB_LOCK:
+                    conn = db()
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                        if action == "kills":
+                            broadcast.team_kill_delta(
+                                conn, mid, tid, data.get("delta", 1), who)
+                        elif action == "eliminate":
+                            broadcast.eliminate_team(conn, mid, tid, who)
+                        elif action == "placement":
+                            broadcast.set_placement(
+                                conn, mid, tid, data.get("placement"),
+                                bool(data.get("manual", True)), who)
+                        else:
+                            raise ValueError("Unknown team action.")
+                        conn.commit()
+                        state = broadcast.match_state(conn, mid)
+                    except Exception:
+                        conn.rollback()
+                        raise
+                    finally:
+                        conn.close()
+            except ValueError as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+            broadcast.publish_update()
+            return self.send_json({"ok": True, "state": state})
+
+        m = re.match(r"^match/(\d+)/player$", rest)
+        if m:
+            mid = int(m.group(1))
+            try:
+                with DB_LOCK:
+                    conn = db()
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                        broadcast.player_action(
+                            conn, mid, data.get("teamId"),
+                            data.get("playerId"), data.get("field"),
+                            data.get("value"), who)
+                        conn.commit()
+                        state = broadcast.match_state(conn, mid)
+                    except Exception:
+                        conn.rollback()
+                        raise
+                    finally:
+                        conn.close()
+            except ValueError as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+            broadcast.publish_update()
+            return self.send_json({"ok": True, "state": state})
+
+        m = re.match(r"^match/(\d+)/undo$", rest)
+        if m:
+            mid = int(m.group(1))
+            try:
+                with DB_LOCK:
+                    conn = db()
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                        broadcast.undo_last(conn, mid, who)
+                        conn.commit()
+                        state = broadcast.match_state(conn, mid)
+                    except Exception:
+                        conn.rollback()
+                        raise
+                    finally:
+                        conn.close()
+            except ValueError as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+            broadcast.publish_update()
+            return self.send_json({"ok": True, "state": state})
+
+        if rest == "overlay-settings":
+            with DB_LOCK:
+                conn = db()
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                    if "themeColor" in data:
+                        color = str(data.get("themeColor") or "").strip()
+                        if not re.match(r"^#[0-9a-fA-F]{6}$", color):
+                            return self.send_json(
+                                {"ok": False,
+                                 "error": "Theme color must be #rrggbb."},
+                                400)
+                        broadcast.set_bsetting(conn, "theme_color", color)
+                    if "logoPath" in data:
+                        broadcast.set_bsetting(
+                            conn, "logo_path",
+                            broadcast._clamp_str(data.get("logoPath"), 200))
+                    if "sponsorText" in data:
+                        broadcast.set_bsetting(
+                            conn, "sponsor_text",
+                            broadcast._clamp_str(data.get("sponsorText"), 120))
+                    if "introTeam" in data:
+                        broadcast.set_bsetting(
+                            conn, "intro_team",
+                            broadcast._clamp_str(data.get("introTeam"), 16))
+                    if data.get("rotateToken"):
+                        broadcast.set_bsetting(
+                            conn, "token", secrets.token_urlsafe(24))
+                    if "pushedCard" in data:
+                        card = data.get("pushedCard")
+                        if card is None:
+                            broadcast.set_bsetting(conn, "pushed_card", "")
+                        else:
+                            broadcast.set_bsetting(
+                                conn, "pushed_card",
+                                json.dumps(card)[:2000])
+                    audit(conn, who, None, "overlay_settings",
+                          new=str(sorted(k for k in data)))
+                    conn.commit()
+                    pairs = {r["key"]: r["value"] for r in conn.execute(
+                        "SELECT key, value FROM overlay_settings")}
+                finally:
+                    conn.close()
+            broadcast.publish_update()
+            return self.send_json({"ok": True,
+                                   "token": pairs.get("token", ""),
+                                   "themeColor": pairs.get("theme_color",
+                                                           "#b6ff3e")})
+
+        if rest == "scoring-rules":
+            try:
+                with DB_LOCK:
+                    conn = db()
+                    try:
+                        conn.execute("BEGIN IMMEDIATE")
+                        old = broadcast.load_rules(conn)
+                        broadcast.save_rules(conn, data)
+                        new = broadcast.load_rules(conn)
+                        audit(conn, who, None, "scoring_rules",
+                              old=json.dumps(old), new=json.dumps(new))
+                        conn.commit()
+                    finally:
+                        conn.close()
+            except (TypeError, ValueError) as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+            broadcast.publish_update()
+            return self.send_json({"ok": True, "rules": new})
 
         return self.send_json({"ok": False, "error": "Not found."}, 404)
 

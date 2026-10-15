@@ -56,6 +56,38 @@ fs.mkdirSync(OUT, { recursive: true });
   const bodyText = await ov.locator('body').innerText();
   if (/cap\d@demo\.invalid|9\d{8}/.test(bodyText)) problems.push('PII visible on overlay shell');
 
+  // admin pages (control desk, matches, overlays, caster) — needs credentials
+  const auser = process.env.BGMI_ADMIN_USER || '';
+  const apass = process.env.BGMI_ADMIN_PASSWORD || '';
+  if (auser && apass) {
+    const actx = await browser.newContext();
+    const adm = await actx.newPage();
+    adm.on('console', (m) => { if (m.type() === 'error') problems.push(`admin console ${m.text()}`); });
+    adm.on('pageerror', (e) => problems.push(`admin pageerror ${e}`));
+    adm.on('response', (r) => {
+      if (r.url().startsWith(BASE) && r.status() >= 400) problems.push(`admin HTTP ${r.status()} ${r.url()}`);
+    });
+    await adm.goto(BASE + '/admin', { waitUntil: 'load' });
+    await adm.fill('#loginUser', auser);
+    await adm.fill('#loginPass', apass);
+    await Promise.all([
+      adm.waitForResponse((r) => r.url().includes('/api/admin/login')
+        && r.status() === 200, { timeout: 15000 }),
+      adm.click('#loginBtn'),
+    ]);
+    for (const p of ['/admin/matches', '/admin/control', '/admin/overlays', '/admin/caster']) {
+      await adm.goto(BASE + p, { waitUntil: 'load' });
+      // fail loudly if we were bounced to the login page
+      await adm.waitForSelector('#logoutNavBtn', { timeout: 15000 });
+      const seg = p.split('/').pop();
+      for (const w of [1440, 768]) await shot(adm, 'admin-' + seg, w, 900);
+      console.log('admin page ' + p + ' ok');
+    }
+    await actx.close();
+  } else {
+    console.log('admin pass skipped (set BGMI_ADMIN_USER/PASSWORD)');
+  }
+
   await browser.close();
   if (problems.length) { console.log('PROBLEMS:', problems); process.exit(1); }
   console.log('broadcast visual smoke OK');

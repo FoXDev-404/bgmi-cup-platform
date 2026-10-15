@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS match_team_results (
   placement      INTEGER,
   placement_auto INTEGER NOT NULL DEFAULT 1,
   kills          INTEGER NOT NULL DEFAULT 0,
+  unassigned_finishes INTEGER NOT NULL DEFAULT 0,
   points         INTEGER NOT NULL DEFAULT 0,
   eliminated_at  INTEGER,
   PRIMARY KEY (match_id, team_id)
@@ -99,6 +100,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
   damage          INTEGER NOT NULL DEFAULT 0,
   status          TEXT NOT NULL DEFAULT 'alive',
   auto_eliminated INTEGER NOT NULL DEFAULT 0,
+  active          INTEGER NOT NULL DEFAULT 1,
   UNIQUE (match_id, player_uid)
 );
 CREATE INDEX IF NOT EXISTS idx_player_stats_match ON player_stats(match_id);
@@ -123,11 +125,85 @@ CREATE TABLE IF NOT EXISTS overlay_settings (
 );
 """
 
+# R2-1: a team fields exactly 4 players in a match — enforced in the database.
+# Created after the column migration so legacy DBs can be repaired first.
+TRIGGERS_SQL = """
+DROP TRIGGER IF EXISTS trg_player_stats_max4_insert;
+DROP TRIGGER IF EXISTS trg_player_stats_max4_update;
+CREATE TRIGGER trg_player_stats_max4_insert
+BEFORE INSERT ON player_stats
+FOR EACH ROW
+WHEN NEW.active = 1
+  AND NOT EXISTS (SELECT 1 FROM player_stats
+                  WHERE match_id = NEW.match_id AND player_uid = NEW.player_uid)
+  AND (
+  SELECT COUNT(*) FROM player_stats
+  WHERE match_id = NEW.match_id AND team_id = NEW.team_id
+    AND active = 1 AND player_uid != NEW.player_uid
+) >= 4
+BEGIN
+  SELECT RAISE(ABORT, 'A team fields exactly 4 players in a match.');
+END;
+CREATE TRIGGER trg_player_stats_max4_update
+BEFORE UPDATE ON player_stats
+FOR EACH ROW
+WHEN NEW.active = 1 AND (
+  SELECT COUNT(*) FROM player_stats
+  WHERE match_id = NEW.match_id AND team_id = NEW.team_id
+    AND active = 1 AND id != NEW.id
+) >= 4
+BEGIN
+  SELECT RAISE(ABORT, 'A team fields exactly 4 players in a match.');
+END;
+"""
+
+
+def _repair_player_actives(conn):
+    """Legacy rows may hold more than 4 players for a team in a match.
+    Keep the first four (lowest id), bench the rest — stats are kept."""
+    for p in conn.execute(
+            "SELECT match_id, team_id FROM player_stats WHERE active = 1 "
+            "GROUP BY match_id, team_id HAVING COUNT(*) > 4").fetchall():
+        extra = [r["id"] for r in conn.execute(
+            "SELECT id FROM player_stats WHERE match_id = ? AND team_id = ? "
+            "AND active = 1 ORDER BY id LIMIT -1 OFFSET 4",
+            (p["match_id"], p["team_id"]))]
+        for row_id in extra:
+            conn.execute("UPDATE player_stats SET active = 0 WHERE id = ?",
+                         (row_id,))
+
+
+def _backfill_unassigned(conn):
+    """FIN becomes player kills + unassigned finishes. Legacy team kill
+    totals above the active players' kills move into the unassigned bucket,
+    so nothing the desk already scored is lost."""
+    conn.execute(
+        "UPDATE match_team_results SET unassigned_finishes = MAX(0, kills - "
+        "COALESCE((SELECT SUM(ps.kills) FROM player_stats ps "
+        "WHERE ps.match_id = match_team_results.match_id "
+        "AND ps.team_id = match_team_results.team_id AND ps.active = 1), 0))")
+
 
 def migrate(conn):
     """Idempotent broadcast migration. Never drops or rewrites existing data.
     Caller holds server.DB_LOCK and commits."""
     conn.executescript(SCHEMA)
+
+    # ---- R2-1: 4 players per team — columns, repair, DB-level triggers ----
+    ps_cols = {r["name"] for r in
+               conn.execute("PRAGMA table_info(player_stats)")}
+    if "active" not in ps_cols:
+        conn.execute("ALTER TABLE player_stats ADD COLUMN active "
+                     "INTEGER NOT NULL DEFAULT 1")
+        _repair_player_actives(conn)
+    mtr_cols = {r["name"] for r in
+                conn.execute("PRAGMA table_info(match_team_results)")}
+    if "unassigned_finishes" not in mtr_cols:
+        conn.execute("ALTER TABLE match_team_results ADD COLUMN "
+                     "unassigned_finishes INTEGER NOT NULL DEFAULT 0")
+        _backfill_unassigned(conn)
+    conn.executescript(TRIGGERS_SQL)
+
     for k, v in DEFAULT_SCORING_RULES.items():
         conn.execute("INSERT OR IGNORE INTO scoring_rules (key, value) "
                      "VALUES (?, ?)", (k, v))
@@ -407,15 +483,24 @@ def set_lineup(conn, match_id, team_ids):
 
 
 def ensure_player_rows(conn, match_id, team_id):
-    """Create player_stats rows for a team's 4 starters (P1..P4) once."""
+    """Create player_stats rows for a team's 4 starters (P1..P4) once.
+    Substitute rows (slot S* / role sub*) are never fielded here."""
     rows = conn.execute(
         "SELECT ign, uid FROM roster_members WHERE team_id = ? "
-        "AND role != 'sub' ORDER BY slot LIMIT 4", (team_id,)).fetchall()
+        "AND UPPER(COALESCE(slot, '')) NOT LIKE 'S%' "
+        "AND LOWER(COALESCE(role, '')) NOT LIKE 'sub%' "
+        "ORDER BY slot LIMIT 4", (team_id,)).fetchall()
     for r in rows:
+        # WHERE NOT EXISTS keeps OR IGNORE from ever tripping the
+        # 4-active-players trigger for a row that is already there
         conn.execute(
-            "INSERT OR IGNORE INTO player_stats "
-            "(match_id, team_id, player_uid, player_name) VALUES (?,?,?,?)",
-            (int(match_id), team_id, r["uid"], r["ign"]))
+            "INSERT INTO player_stats "
+            "(match_id, team_id, player_uid, player_name, active) "
+            "SELECT ?,?,?,?,1 WHERE NOT EXISTS ("
+            "SELECT 1 FROM player_stats WHERE match_id = ? AND team_id = ? "
+            "AND player_uid = ?)",
+            (int(match_id), team_id, r["uid"], r["ign"],
+             int(match_id), team_id, r["uid"]))
 
 
 def start_match(conn, match_id, who=""):
@@ -580,17 +665,37 @@ def undo_last(conn, match_id, who=""):
     team = payload["team"]
     conn.execute(
         "UPDATE match_team_results SET placement = ?, placement_auto = ?, "
-        "kills = ?, points = ?, eliminated_at = ? "
+        "kills = ?, unassigned_finishes = ?, points = ?, eliminated_at = ? "
         "WHERE match_id = ? AND team_id = ?",
         (team["placement"], team["placement_auto"], team["kills"],
-         team["points"], team["eliminated_at"], int(match_id),
-         team["team_id"]))
-    for p in payload["players"]:
+         team.get("unassigned_finishes") or 0, team["points"],
+         team["eliminated_at"], int(match_id), team["team_id"]))
+    # bench flags restore in safe passes so the 4-player trigger is never
+    # tripped mid-restore: deactivate rows the snapshot did not have at all,
+    # then snapshot rows that were benched, then reactivate the rest.
+    uids = [p["player_uid"] for p in payload["players"]]
+    if uids:
         conn.execute(
-            "UPDATE player_stats SET kills = ?, damage = ?, status = ?, "
-            "auto_eliminated = ? WHERE match_id = ? AND player_uid = ?",
-            (p["kills"], p["damage"], p["status"], p["auto_eliminated"],
-             int(match_id), p["player_uid"]))
+            "UPDATE player_stats SET active = 0 WHERE match_id = ? "
+            "AND team_id = ? AND active = 1 AND player_uid NOT IN (%s)"
+            % ",".join("?" * len(uids)),
+            [int(match_id), team["team_id"]] + uids)
+    for p in payload["players"]:
+        if not p.get("active", 1):
+            conn.execute(
+                "UPDATE player_stats SET kills = ?, damage = ?, status = ?, "
+                "auto_eliminated = ?, active = 0 WHERE match_id = ? "
+                "AND player_uid = ?",
+                (p["kills"], p["damage"], p["status"], p["auto_eliminated"],
+                 int(match_id), p["player_uid"]))
+    for p in payload["players"]:
+        if p.get("active", 1):
+            conn.execute(
+                "UPDATE player_stats SET kills = ?, damage = ?, status = ?, "
+                "auto_eliminated = ?, active = 1 WHERE match_id = ? "
+                "AND player_uid = ?",
+                (p["kills"], p["damage"], p["status"], p["auto_eliminated"],
+                 int(match_id), p["player_uid"]))
     conn.execute("UPDATE event_log SET undone = 1 WHERE id = ?", (row["id"],))
     _log_event(conn, match_id, "undo", row["team_id"],
                "Undid: %s" % (row["description"] or row["type"]))
@@ -607,10 +712,12 @@ def _match_teams_rows(conn, match_id):
         (int(match_id),))]
 
 
-def _team_players(conn, match_id, team_id):
-    return [dict(r) for r in conn.execute(
-        "SELECT * FROM player_stats WHERE match_id = ? AND team_id = ? "
-        "ORDER BY id", (int(match_id), team_id))]
+def _team_players(conn, match_id, team_id, active_only=True):
+    q = ("SELECT * FROM player_stats WHERE match_id = ? AND team_id = ? ")
+    if active_only:
+        q += "AND active = 1 "
+    q += "ORDER BY id"
+    return [dict(r) for r in conn.execute(q, (int(match_id), team_id))]
 
 
 def _team_name(conn, team_id):
@@ -642,11 +749,13 @@ def _resync(conn, match_id):
         conn.execute("UPDATE matches SET sequence = ? WHERE id = ?",
                      (sequence, int(match_id)))
     for row in view:
-        pts = compute_points(row["kills"], row["placement"], rules)
+        fin = int(row.get("unassigned_finishes") or 0) + \
+            sum(int(p["kills"]) for p in row["_players"])
+        pts = compute_points(fin, row["placement"], rules)
         conn.execute(
-            "UPDATE match_team_results SET placement = ?, eliminated_at = ?, "
-            "points = ? WHERE match_id = ? AND team_id = ?",
-            (row["placement"], row["eliminated_at"], pts,
+            "UPDATE match_team_results SET kills = ?, placement = ?, "
+            "eliminated_at = ?, points = ? WHERE match_id = ? AND team_id = ?",
+            (fin, row["placement"], row["eliminated_at"], pts,
              int(match_id), row["team_id"]))
 
 
@@ -660,19 +769,21 @@ def _require_team(conn, match_id, team_id):
 
 
 def team_kill_delta(conn, match_id, team_id, delta, who=""):
+    """Unassigned team finishes: used only when the killer isn't attributed
+    to a player. Team FIN = active players' kills + unassigned (via _resync)."""
     match = get_match(conn, match_id)
     if not match or match["status"] not in ("live", "awaiting_verification"):
         raise ValueError("The match is not live.")
     team = _require_team(conn, match_id, team_id)
     snap = _snapshot(conn, match_id, team_id)
     delta = _clamp_int(delta, -50, 50)
-    kills = max(0, int(team["kills"]) + delta)
-    conn.execute("UPDATE match_team_results SET kills = ? "
+    un = max(0, int(team["unassigned_finishes"] or 0) + delta)
+    conn.execute("UPDATE match_team_results SET unassigned_finishes = ? "
                  "WHERE match_id = ? AND team_id = ?",
-                 (kills, int(match_id), team_id))
+                 (un, int(match_id), team_id))
     name, _ = _team_name(conn, team_id)
     _log_event(conn, match_id, "kill", team_id,
-               "%s team kills: %d (+%d)" % (name, kills, delta), snap)
+               "%s unassigned finishes: %d (%+d)" % (name, un, delta), snap)
     _resync(conn, match_id)
 
 
@@ -686,6 +797,8 @@ def player_action(conn, match_id, team_id, player_id, field, value, who=""):
                      (int(player_id), int(match_id))).fetchone()
     if not p:
         raise ValueError("Player not found in this match.")
+    if not p["active"]:
+        raise ValueError("%s is benched in this match." % p["player_name"])
     snap = _snapshot(conn, match_id, team_id)
     name = p["player_name"]
     tname, _ = _team_name(conn, team_id)
@@ -731,6 +844,100 @@ def eliminate_team(conn, match_id, team_id, who=""):
     name, _ = _team_name(conn, team_id)
     _log_event(conn, match_id, "eliminate", team_id,
                "%s eliminated — %s place" % (name, ordinal(placed)), snap)
+
+
+def swap_player(conn, match_id, team_id, bench_id, in_kind, in_id, who=""):
+    """Per-match swap: bench one of the 4 active players and activate an
+    incoming player (a roster substitute, or someone benched earlier in this
+    match). The replaced player keeps their stats; both sides are logged.
+    in_kind: 'roster' (roster_members.id) or 'stats' (player_stats.id)."""
+    match = get_match(conn, match_id)
+    if not match:
+        raise ValueError("Match not found.")
+    if match["status"] not in ("upcoming", "live", "awaiting_verification"):
+        raise ValueError("A published match cannot be changed — "
+                         "unpublish it first.")
+    _require_team(conn, match_id, team_id)
+    try:
+        bench_id, in_id = int(bench_id), int(in_id)
+    except (TypeError, ValueError):
+        raise ValueError("Pick the player to replace and the incoming player.")
+    if in_kind not in ("roster", "stats"):
+        raise ValueError("Unknown swap type.")
+    ensure_player_rows(conn, match_id, team_id)
+
+    bench = conn.execute(
+        "SELECT * FROM player_stats WHERE id = ? AND match_id = ? "
+        "AND team_id = ?", (bench_id, int(match_id), team_id)).fetchone()
+    if not bench:
+        raise ValueError("The player to replace is not in this match.")
+    if not bench["active"]:
+        raise ValueError("%s is already on the bench." % bench["player_name"])
+
+    if in_kind == "roster":
+        member = conn.execute(
+            "SELECT * FROM roster_members WHERE id = ? AND team_id = ?",
+            (in_id, team_id)).fetchone()
+        if not member:
+            raise ValueError("That substitute is not on this team's roster.")
+        in_name, in_uid = member["ign"], member["uid"]
+    else:
+        member = conn.execute(
+            "SELECT * FROM player_stats WHERE id = ? AND match_id = ? "
+            "AND team_id = ?", (in_id, int(match_id), team_id)).fetchone()
+        if not member:
+            raise ValueError("That player is not in this match.")
+        in_name, in_uid = member["player_name"], member["player_uid"]
+
+    incoming = conn.execute(
+        "SELECT * FROM player_stats WHERE match_id = ? AND player_uid = ?",
+        (int(match_id), in_uid)).fetchone()
+    if incoming and incoming["active"]:
+        raise ValueError("%s is already playing." % in_name)
+    if incoming and incoming["id"] == bench["id"]:
+        raise ValueError("Pick a different player for the swap.")
+
+    snap = _snapshot(conn, match_id, team_id)
+    # bench first: the database triggers never allow a 5th active player
+    conn.execute("UPDATE player_stats SET active = 0 WHERE id = ?",
+                 (bench["id"],))
+    if incoming:
+        conn.execute("UPDATE player_stats SET active = 1 WHERE id = ?",
+                     (incoming["id"],))
+    else:
+        conn.execute(
+            "INSERT INTO player_stats (match_id, team_id, player_uid, "
+            "player_name, active) VALUES (?,?,?,?,1)",
+            (int(match_id), team_id, in_uid, in_name))
+    name, _ = _team_name(conn, team_id)
+    _log_event(conn, match_id, "swap", team_id,
+               "%s: %s comes on for %s" % (name, in_name, bench["player_name"]),
+               snap)
+    _resync(conn, match_id)
+    return {"in": in_name, "out": bench["player_name"]}
+
+
+def _bench_options(conn, match_id, team_id):
+    """Roster members not on the floor right now: the registered substitutes
+    plus players benched earlier in this match (their stats are kept)."""
+    out, seen = [], set()
+    for r in conn.execute(
+            "SELECT id, slot, ign, uid FROM roster_members WHERE team_id = ? "
+            "AND (UPPER(COALESCE(slot, '')) LIKE 'S%' OR "
+            "LOWER(COALESCE(role, '')) LIKE 'sub%') ORDER BY slot",
+            (team_id,)):
+        out.append({"kind": "roster", "id": r["id"], "name": r["ign"],
+                    "slot": r["slot"] or "SUB"})
+        seen.add(r["uid"])
+    for p in conn.execute(
+            "SELECT id, player_uid, player_name FROM player_stats "
+            "WHERE match_id = ? AND team_id = ? AND active = 0 ORDER BY id",
+            (int(match_id), team_id)):
+        if p["player_uid"] in seen:
+            continue
+        out.append({"kind": "stats", "id": p["id"], "name": p["player_name"],
+                    "slot": "bench"})
+    return out
 
 
 def set_placement(conn, match_id, team_id, placement, manual=True, who=""):
@@ -808,6 +1015,7 @@ def match_state(conn, match_id):
         alive = knocked = out = 0
         for p in _team_players(conn, match_id, r["team_id"]):
             players.append({"id": p["id"], "name": p["player_name"],
+                            "uid": p["player_uid"],
                             "kills": p["kills"], "damage": p["damage"],
                             "status": p["status"]})
             if p["status"] == "alive":
@@ -819,12 +1027,14 @@ def match_state(conn, match_id):
         if alive or knocked:
             alive_total += 1
         teams.append(dict(pub, kills=r["kills"],
+                          unassigned=r["unassigned_finishes"],
                           placement=r["placement"],
                           placementAuto=bool(r["placement_auto"]),
                           points=compute_points(r["kills"], r["placement"],
                                                 rules),
                           eliminatedAt=r["eliminated_at"],
                           players=players,
+                          bench=_bench_options(conn, match_id, r["team_id"]),
                           alive=alive, knocked=knocked, out=out))
     teams.sort(key=lambda t: (-t["points"],
                               t["placement"] or 10 ** 6, -t["kills"],
@@ -1056,6 +1266,16 @@ def live_state(conn):
     e-mail, phone or UID."""
     match = live_match(conn)
     current = match_state(conn, match["id"]) if match else None
+    # the admin build carries per-player UIDs and bench options — keep them
+    # out of the public payload
+    public_teams = []
+    for t in (current["teams"] if current else []):
+        t = dict(t)
+        t["players"] = [{k: p[k] for k in
+                         ("id", "name", "kills", "damage", "status")}
+                        for p in t.get("players", [])]
+        t.pop("bench", None)
+        public_teams.append(t)
     groups = group_tables(conn, include_live=True)
     overall = standings_rows(conn, None, include_live=True)
     published = standings_rows(conn, None, include_live=False)
@@ -1063,7 +1283,7 @@ def live_state(conn):
     return {
         "ok": True,
         "match": current["match"] if current else None,
-        "teams": current["teams"] if current else [],
+        "teams": public_teams,
         "teamsAlive": current["teamsAlive"] if current else 0,
         "groups": groups,
         "overall": overall,
@@ -1103,7 +1323,9 @@ def overlay_state(conn, name):
         if pub["teamName"] != "?":
             roster = [r["ign"] for r in conn.execute(
                 "SELECT ign FROM roster_members WHERE team_id = ? "
-                "AND role != 'sub' ORDER BY slot LIMIT 4", (intro_team,))]
+                "AND UPPER(COALESCE(slot, '')) NOT LIKE 'S%' "
+                "AND LOWER(COALESCE(role, '')) NOT LIKE 'sub%' "
+                "ORDER BY slot LIMIT 4", (intro_team,))]
             intro = dict(pub, roster=roster)
     data = {
         "live-leaderboard": {"match": _pub_match(match), "teams": teams,

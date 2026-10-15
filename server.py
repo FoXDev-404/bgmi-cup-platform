@@ -2387,7 +2387,7 @@ class Handler(BaseHTTPRequestHandler):
 
         # ---- live desk actions ----
         m = re.match(r"^match/(\d+)/team/([^/]+)"
-                     r"(?:/(kills|eliminate|placement))?$", rest)
+                     r"(?:/(kills|eliminate|placement|swap))?$", rest)
         if m:
             mid, tid, action = int(m.group(1)), m.group(2), m.group(3)
             try:
@@ -2404,6 +2404,13 @@ class Handler(BaseHTTPRequestHandler):
                             broadcast.set_placement(
                                 conn, mid, tid, data.get("placement"),
                                 bool(data.get("manual", True)), who)
+                        elif action == "swap":
+                            res = broadcast.swap_player(
+                                conn, mid, tid, data.get("benchId"),
+                                str(data.get("inKind") or "roster"),
+                                data.get("inId"), who)
+                            audit(conn, who, tid, "match_swap",
+                                  old=res["out"], new=res["in"])
                         else:
                             raise ValueError("Unknown team action.")
                         conn.commit()

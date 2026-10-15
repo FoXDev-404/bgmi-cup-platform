@@ -5,12 +5,16 @@
 Requested follow-ups after the merge dry run. Safety: demo/seed DB only (backup taken:
 `backups/demo-pre-4players-20261015-205758.db`), live DB/uploads/.env untouched, no OBS actions.
 
-- [ ] R2-1. Exactly 4 players per team in a match — **Not started**
-       `player_stats.active` flag + SQLite triggers (hard cap of 4 active per match/team),
-       `match_team_results.unassigned_finishes` (FIN = Σ active player kills + unassigned),
-       repair migration (keep 4 lowest-id actives, bench rest, keep stats), robust starter
-       selection (slot `S*` / role `sub*` never counted), per-match swap (bench + activate sub,
-       event log + audit log, replaced player's stats stay), bench list in desk state, tests.
+- [x] R2-1. Exactly 4 players per team in a match — **Done** (commit after tests: 107/107)
+       `player_stats.active` + triggers (hard cap of 4 active per match/team, drop+recreate in
+       `TRIGGERS_SQL`), `match_team_results.unassigned_finishes` (FIN = Σ active player kills +
+       unassigned; `team_kill_delta` now feeds that bucket), robust starter selection
+       (slot `S*`/role `sub*` excluded + `NOT EXISTS` guard so re-ensuring never trips the trigger),
+       repair migration (verify on demo: D001 5 = 4 player + 1 unassigned; D005 2 unassigned),
+       swap via `POST /api/admin/match/<id>/team/<tid>/swap` (bench-first, event + audit log,
+       stats kept, undo restores the four), `/api/live/state` strips uid+bench, bench list in desk state.
+       13 new checks: 4-per-squad, swap + logs + undo, refusal of an already-playing sub,
+       DB guard (5th insert aborts), legacy repair keeps rows, no benched/UID data on /live or overlays.
 - [ ] R2-2. Old broadcast overlays served as-is — **Not started**
        restore original `overlay.html/.css/.js` (+ assets) from `b91ccef:broadcast-src/`,
        serve at `/overlay/<scene>` with token gate; tiny `/socket.io/socket.io.js` shim →

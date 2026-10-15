@@ -436,6 +436,121 @@ def main():
            st == 200 and pinned["placement"] == 1
            and pinned.get("placementAuto") is False, str(pinned)[:160])
 
+    # ---------- 4 players per team + per-match swap ----------
+    print("\n[4 players + sub swap]")
+    st, d = j("GET", "/api/admin/matches/%d" % mid, headers=T.ah())
+    counts = [len(t["players"]) for t in d["state"]["teams"]]
+    report("desk lists exactly 4 players per squad",
+           st == 200 and len(counts) >= 2 and all(n == 4 for n in counts),
+           str(counts))
+    swap_team = next((t for t in d["state"]["teams"]
+                      if any(b.get("kind") == "roster"
+                             for b in (t.get("bench") or []))), None)
+    report("a live-match squad offers its substitute for a swap",
+           swap_team is not None)
+    if swap_team:
+        out_p = swap_team["players"][0]
+        sub = next(b for b in swap_team["bench"] if b["kind"] == "roster")
+        st, d = j("POST", "/api/admin/match/%d/team/%s/swap"
+                  % (mid, swap_team["teamId"]),
+                  {"benchId": out_p["id"], "inKind": "roster", "inId": sub["id"]},
+                  headers=T.ah())
+        t2 = next(t for t in d["state"]["teams"]
+                  if t["teamId"] == swap_team["teamId"])
+        names2 = [p["name"] for p in t2["players"]]
+        report("swap fields the sub (still exactly 4 on the floor)",
+               st == 200 and len(t2["players"]) == 4 and sub["name"] in names2
+               and out_p["name"] not in names2,
+               "status=%s names=%s" % (st, names2))
+        report("swap is in the event log",
+               "comes on for" in json.dumps(d["state"]["events"]))
+        st, d = j("GET", "/api/admin/audit?teamId=%s" % swap_team["teamId"],
+                  headers=T.ah())
+        report("swap is in the audit log",
+               st == 200 and "match_swap" in json.dumps(d), str(d)[:160])
+        st, d = j("GET", "/api/admin/matches/%d" % mid, headers=T.ah())
+        other = next(t for t in d["state"]["teams"]
+                     if t["teamId"] == swap_team["teamId"])
+        out_opt = next((b for b in (other.get("bench") or [])
+                        if b["name"] == out_p["name"]), None)
+        report("benched player stays available with stats kept",
+               out_opt is not None, str(other.get("bench"))[:160])
+        st, d = j("POST", "/api/admin/match/%d/team/%s/swap"
+                  % (mid, swap_team["teamId"]),
+                  {"benchId": other["players"][1]["id"],
+                   "inKind": "roster", "inId": sub["id"]}, headers=T.ah())
+        report("activating a player who is already on the floor is refused",
+               st == 400 and "already" in json.dumps(d).lower(),
+               "status=%s body=%s" % (st, str(d)[:160]))
+        st, live = j("GET", "/api/live/state")
+        lteam = next((t for t in live.get("teams", [])
+                      if t.get("teamId") == swap_team["teamId"]), None)
+        live_names = [p["name"] for p in (lteam or {}).get("players", [])]
+        report("public /live never shows benched players",
+               st == 200 and lteam is not None and len(live_names) == 4
+               and out_p["name"] not in live_names,
+               "status=%s names=%s" % (st, live_names))
+        report("public /live has no UIDs",
+               "uid" not in json.dumps(live).lower())
+        st, cfg = j("GET", "/api/admin/overlay-settings", headers=T.ah())
+        tok = (cfg or {}).get("token", "")
+        st, ov = j("GET", "/api/overlay/state/live-leaderboard?token=%s" % tok)
+        report("overlay payload carries no UIDs",
+               st == 200 and "uid" not in json.dumps(ov).lower(),
+               "status=%s" % st)
+        st, d = j("POST", "/api/admin/match/%d/undo" % mid, {}, headers=T.ah())
+        t3 = next(t for t in d["state"]["teams"]
+                  if t["teamId"] == swap_team["teamId"])
+        names3 = [p["name"] for p in t3["players"]]
+        report("undo restores the pre-swap four",
+               st == 200 and len(t3["players"]) == 4
+               and out_p["name"] in names3 and sub["name"] not in names3,
+               "status=%s names=%s" % (st, names3))
+
+    # ---------- 4-player DB guard + legacy repair ----------
+    print("\n[4-player DB guard]")
+    with server_conn() as conn:
+        m1 = conn.execute("SELECT id FROM matches WHERE status = 'published' "
+                          "ORDER BY match_number LIMIT 1").fetchone()
+        tid_rep = conn.execute(
+            "SELECT team_id FROM match_team_results WHERE match_id = ? "
+            "ORDER BY team_id LIMIT 1", (m1["id"],)).fetchone()["team_id"]
+        # simulate a legacy DB predating the triggers: six extra players
+        conn.execute("DROP TRIGGER IF EXISTS trg_player_stats_max4_insert")
+        conn.execute("DROP TRIGGER IF EXISTS trg_player_stats_max4_update")
+        for i in range(6):
+            conn.execute(
+                "INSERT INTO player_stats (match_id, team_id, player_uid, "
+                "player_name, kills, damage, status, active) "
+                "VALUES (?,?,?,?,0,0,'out',1)",
+                (m1["id"], tid_rep, "REPAIR-%s-%d" % (tid_rep, i),
+                 "RepairPlayer%d" % i))
+        broadcast._repair_player_actives(conn)
+        n_active = conn.execute(
+            "SELECT COUNT(*) AS c FROM player_stats WHERE match_id = ? "
+            "AND team_id = ? AND active = 1",
+            (m1["id"], tid_rep)).fetchone()["c"]
+        n_all = conn.execute(
+            "SELECT COUNT(*) AS c FROM player_stats WHERE match_id = ? "
+            "AND team_id = ?", (m1["id"], tid_rep)).fetchone()["c"]
+        conn.executescript(broadcast.TRIGGERS_SQL)   # restore the guards
+        conn.commit()
+        report("legacy repair benches extras and keeps every row",
+               n_active == 4 and n_all >= 10,
+               "active=%s rows=%s" % (n_active, n_all))
+        try:
+            conn.execute(
+                "INSERT INTO player_stats (match_id, team_id, player_uid, "
+                "player_name, active) VALUES (?,?,?,?,1)",
+                (m1["id"], tid_rep, "FIFTH-%s" % tid_rep, "FifthPlayer"))
+            conn.commit()
+            blocked, guard_msg = False, "insert succeeded"
+        except sqlite3.Error as e:
+            blocked, guard_msg = True, str(e)
+            conn.rollback()
+        report("database refuses a 5th active player",
+               blocked and "exactly 4" in guard_msg, guard_msg[:120])
+
     # ---------- undo ----------
     print("\n[undo]")
     st, d = j("POST", "/api/admin/match/%d/team/%s/kills" % (mid, t1),

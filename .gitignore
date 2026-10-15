@@ -12,9 +12,10 @@ node_modules/
 # OpenCode config backups (timestamped, contain no secrets but are local-only).
 opencode.json.bak-*
 
-# Local secrets — never commit.
+# Local secrets — never commit (.env.example is the committed list of names).
 .env
 .env.*
+!.env.example
 
 # Live data & participant submissions — PII, never commit.
 # data/ holds the SQLite database and uploaded team logos; only .gitkeep

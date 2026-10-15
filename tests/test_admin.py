@@ -6,7 +6,7 @@ Covers: public /status + privacy, the full admin lifecycle (login, queue,
 edit + audit, status actions, slot limit, groups, exports, purge guard) and
 teardown that leaves the database exactly as it found it.
 
-Usage:  python tests/test_admin.py            (server must be running on :8080)
+Usage:  python tests/test_admin.py            (self-hosted: temp DB/uploads on a free port)
         BASE=http://127.0.0.1:8090 python tests/test_admin.py
 
 Reuses the admin fixture helpers from test_api.py (throwaway account,

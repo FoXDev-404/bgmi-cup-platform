@@ -45,12 +45,11 @@ no API key, $0).
 Stack: Python 3 stdlib only (`server.py`, SQLite), plain HTML/CSS/JS, Playwright
 (chromium). No venv, no requirements, no npm scripts. Never `pip install` here.
 
-Commands (all isolated — real `registrations.db` untouched):
+Commands (all isolated — real `data/registrations.db` untouched):
 - Start dev server: `python server.py` (http://127.0.0.1:8080; `PORT`, `BGMI_DB`,
-  `BGMI_UPLOADS` env overrides, `server.py:44-50`).
-- API suite (self-hosted temp DB): `python test_api.py`
-- Admin suite (needs server on :8080 with temp DB): start server with
-  `PORT=8080 BGMI_DB=<temp> BGMI_UPLOADS=<tempdir>`, then `python test_admin.py`
+  `BGMI_UPLOADS` env overrides, `server.py:46-49`).
+- API suite (self-hosted temp DB): `python tests/test_api.py`
+- Admin suite (self-hosted temp DB): `python tests/test_admin.py`
 - Browser tests: `npx playwright test` (`tests/`, chromium only).
 
 Rules:

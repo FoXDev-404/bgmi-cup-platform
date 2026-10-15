@@ -80,7 +80,7 @@ fs.mkdirSync(OUT, { recursive: true });
       // fail loudly if we were bounced to the login page
       await adm.waitForSelector('#logoutNavBtn', { timeout: 15000 });
       const seg = p.split('/').pop();
-      for (const w of [1440, 768]) await shot(adm, 'admin-' + seg, w, 900);
+      for (const w of [1440, 768, 390]) await shot(adm, 'admin-' + seg, w, 900);
       console.log('admin page ' + p + ' ok');
     }
     await actx.close();

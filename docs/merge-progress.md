@@ -30,17 +30,19 @@ Status key: **Done** = code + tests verified by running · **Partial** = impleme
        (admin-shell.js) / 8 s freshness poll (live.js); cleanup on broken pipe in broadcast.py.
 - [x] 9. Cleanup — **Done**
        broadcast-src/ removed; unified README + .env.example + .gitignore (qa-shots, graft, data/,
-       uploads, .env); seed_demo.py with --clean; shared js/nav.js (no duplicated inline navbar);
+       uploads, .env); seed_demo.py with --clean (now self-initialising: it runs the idempotent
+       `init_db` so it works on a fresh DB); shared js/nav.js (no duplicated inline navbar);
        scripts/verify-broadcast.js kept as the repeatable visual smoke (public + overlays + admin pass).
-       Note: seed_demo.py requires schema first — README documents `python -c "import server; server.init_db()"`.
 - [x] 10. Security checks, tests and the full dry run — **Done**
        Automated: `tests/broadcast-flow.spec.js` green (register → approve → group → match → desk score →
        publish → /live, /results, overlay + token gate, PII assertions). Full `npx playwright test`: 8/8.
        Python suites: 104 + 94 + 94.
        Visual dry run (temp seeded DB, `scripts/verify-broadcast.js`): /live + /results at 1440/768/390,
-       all 11 overlays at 1920×1080, admin pages at 1440/768 — clean (no console errors, no 4xx).
+       all 11 overlays at 1920×1080, admin pages at 1440/768/390 — clean (no console errors, no 4xx).
        Interactive desk check: "Eliminate squad" on `/admin/control` → `/live` alive counter updates
        live 4/4 → 3/4 without reload (SSE), auto-placement + event log correct.
+       Concurrency check: desk + `/live` + teams-alive + live-leaderboard overlays open together —
+       one SSE stream each, all four update after a desk action, nothing blocks.
        Bug found & fixed in the dry run: broadcast admin pages used relative asset/link paths, so the
        pretty URLs `/admin/<page>` served them unstyled with 404 CSS/JS (commit `973e943` — now
        root-absolute, matching `overlay.html`'s pattern).

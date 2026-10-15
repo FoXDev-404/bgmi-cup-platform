@@ -50,6 +50,8 @@ def ign(n):
 def main(clean=None):
     if clean is None:
         clean = "--clean" in sys.argv
+    # idempotent — works on a brand-new DB too (no manual init needed)
+    server.init_db()
     now = datetime.now(timezone.utc)
     with server.DB_LOCK:
         conn = server.db()

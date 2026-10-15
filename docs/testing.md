@@ -2,9 +2,14 @@
 
 ```powershell
 python tests/test_api.py           # 104 checks
-python tests/test_admin.py         # 94 checks (waits 61s once for the public lookup bucket)
+python tests/test_admin.py         # 96 checks (waits 61s once for the public lookup bucket)
 npx playwright test                # browser specs (tests/, Chromium; run `npm install` once)
 ```
+
+One command runs all of the above plus the nine end-to-end stage scripts in
+`tests/e2e/` (each against a freshly seeded throw-away DB): `scripts\verify.bat`
+on Windows, `scripts/verify.sh` in bash. Full details and results:
+`docs/verification-report.md`.
 
 **Isolation** — with no `BASE` set, each Python suite boots its own throwaway
 server on a free port with a temporary database and uploads folder and removes

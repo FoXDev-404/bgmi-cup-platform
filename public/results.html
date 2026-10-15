@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Results · BGMI Champions Cup</title>
+<meta name="description" content="Standings, group tables and match results of the BGMI Champions Cup.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Special+Elite&family=Caveat:wght@600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="container nav">
+    <a class="brand" href="/">BGMI <span>CUP</span></a>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
+    <nav class="nav-links">
+      <a href="/">Home</a>
+      <a href="/teams">Teams</a>
+      <a href="/schedule">Schedule</a>
+      <a href="/live">Live</a>
+      <a class="active" href="/results">Results</a>
+      <a href="/status">Status</a>
+      <a href="/about">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="section">
+  <div class="container">
+    <div class="admlive">
+      <div class="stamp" style="color:var(--acid)">Published results</div>
+      <h1>RESULTS <span class="thin">& STANDINGS</span></h1>
+      <p class="muted">Only published matches count. Points = placement points + kills.</p>
+    </div>
+
+    <section class="admcard" style="margin-bottom:18px">
+      <h3>Overall standings</h3>
+      <div style="overflow-x:auto"><table class="tbl">
+        <thead><tr><th>#</th><th>Team</th><th>Group</th><th>P</th><th>W</th><th>K</th><th>Pos</th><th>Total</th></tr></thead>
+        <tbody id="standings"></tbody>
+      </table></div>
+      <p id="empty" class="muted" hidden>No results yet.</p>
+    </section>
+
+    <div id="groups" class="admgrid"></div>
+
+    <section class="admcard" style="margin-top:18px">
+      <h3>Match results</h3>
+      <div id="matches" class="admgrid"></div>
+    </section>
+
+    <section class="admcard" style="margin-top:18px">
+      <h3>Top fraggers</h3>
+      <div style="overflow-x:auto"><table class="tbl">
+        <thead><tr><th>#</th><th>Player</th><th>Team</th><th>Kills</th><th>Damage</th></tr></thead>
+        <tbody id="fraggers"></tbody>
+      </table></div>
+    </section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container fcols">
+    <div><h4>Event</h4><p>BGMI Champions Cup</p><p><a href="/schedule">Schedule</a></p><p><a href="/teams">Teams</a></p></div>
+    <div><h4>Watch</h4><p><a href="/live">Live</a></p><p><a href="/results">Results</a></p><p><a href="/about">About</a></p></div>
+    <div><h4>Legal</h4><p><a href="/privacy.html">Privacy</a></p></div>
+  </div>
+</footer>
+<script src="/js/nav.js"></script>
+<script src="/js/results.js"></script>
+</body>
+</html>

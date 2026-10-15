@@ -48,6 +48,7 @@ DEFAULT_OVERLAY_SETTINGS = {
     "sponsor_text": "",
     "intro_team": "",            # team_id pinned on the team-intro overlay
     "pushed_card": "",           # JSON card pushed from the caster desk
+    "disabled": "",              # JSON list of hidden overlay names
 }
 
 DEFAULT_SCORING_RULES = dict(
@@ -1016,6 +1017,16 @@ def recent_matches(conn, limit=6):
     return out
 
 
+def disabled_overlays(conn):
+    """Names of overlays the producer has switched off (JSON list)."""
+    raw = get_bsetting(conn, "disabled", "")
+    try:
+        names = json.loads(raw or "[]")
+    except ValueError:
+        names = []
+    return [n for n in names if n in OVERLAY_NAMES]
+
+
 def pushed_card(conn):
     raw = get_bsetting(conn, "pushed_card", "")
     if not raw:
@@ -1133,6 +1144,7 @@ def overlay_state(conn, name):
             "themeColor": get_bsetting(conn, "theme_color", "#b6ff3e"),
             "logo": get_bsetting(conn, "logo_path", ""),
             "sponsor": get_bsetting(conn, "sponsor_text", ""),
+            "disabled": name in disabled_overlays(conn),
             "data": data, "updatedAt": now_iso()}
 
 

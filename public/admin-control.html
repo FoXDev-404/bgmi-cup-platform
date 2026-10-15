@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Match Control Desk — BGMI Cup</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0d10'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='bold' fill='%23b6ff3e' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css?v=5">
+  <link rel="stylesheet" href="css/control.css?v=1">
+  <link rel="stylesheet" href="css/footer.css?v=1">
+</head>
+<body>
+
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== NAV ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">BGMI<em>//</em>CUP<b>.26</b></a>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link" href="/admin">Control Room</a>
+        <a class="nav-link" href="/admin/matches">Matches</a>
+        <a class="nav-link" href="/admin/overlays">Overlays</a>
+        <a class="nav-link" href="/admin/caster">Caster</a>
+        <a class="btn-outline btn-sm nav-cta nav-link" id="logoutNavBtn" href="#">Log out</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+  <div class="nav-overlay hidden" id="navOverlay"></div>
+
+  <!-- ========== DESK ========== -->
+  <main class="pan" id="top" style="max-width:1500px;">
+    <header class="bc-head">
+      <div>
+        <div class="bc-eyebrow">broadcast &mdash; live scoring</div>
+        <h1 class="bc-title">Match control desk</h1>
+        <p class="bc-user">signed in as <b id="whoAmI">&hellip;</b></p>
+      </div>
+      <div class="bc-actions">
+        <label class="bc-label" for="matchPick" style="margin:0;">Match</label>
+        <select class="bc-select" id="matchPick" style="width:auto;"></select>
+      </div>
+    </header>
+
+    <div class="bc-notice hidden" id="deskNotice" role="alert"></div>
+
+    <!-- no matches yet -->
+    <div class="bc-empty hidden" id="deskEmpty">
+      No matches yet. <a href="/admin/matches" style="color:var(--acid);">Create one on the Matches page</a>,
+      check the squads in, then come back here.
+    </div>
+
+    <div id="deskBody" class="hidden">
+      <!-- sticky top bar -->
+      <div class="bc-desk-top" id="deskTop">
+        <span class="bc-desk-id" id="deskMatchNo">&mdash;</span>
+        <span class="bc-desk-meta" id="deskMeta"></span>
+        <span id="deskStatus"></span>
+        <span class="bc-alive-count">Teams alive <b id="deskAlive">0/0</b></span>
+        <span class="bc-timer" id="deskTimer">00:00</span>
+        <button class="bc-btn bc-btn--live" id="startBtn">Start match</button>
+        <button class="bc-btn" id="endBtn">End &amp; review</button>
+      </div>
+
+      <div class="bc-desk-grid">
+        <!-- squad grid -->
+        <section>
+          <div class="bc-squads" id="squadGrid"></div>
+          <div class="bc-keys">
+            <span><kbd>S</kbd> start/end</span>
+            <kbd>U</kbd> undo
+            <kbd>R</kbd> refresh
+            <span>click a squad placement &rarr; type a number to pin</span>
+          </div>
+        </section>
+
+        <!-- right sidebar -->
+        <aside class="bc-side">
+          <div class="bc-card">
+            <h2 class="bc-h2">Live standings</h2>
+            <table class="bc-standings-mini">
+              <thead><tr><th>#</th><th>Squad</th><th>Fr</th><th>Pts</th></tr></thead>
+              <tbody id="sideStandings"></tbody>
+            </table>
+          </div>
+          <div class="bc-card">
+            <h2 class="bc-h2">Event log</h2>
+            <ul class="bc-eventlog" id="sideEvents"></ul>
+            <button class="bc-btn" id="undoBtn" style="margin-top:10px;">&#8630; Undo last action</button>
+          </div>
+        </aside>
+      </div>
+
+      <!-- verify + publish -->
+      <div class="bc-publish-bar">
+        <span class="bc-problem hidden" id="publishProblem"></span>
+        <span class="bc-p" id="publishHint" style="margin:0;"></span>
+        <button class="bc-btn bc-btn--go" id="publishBtn" style="margin-left:auto;" disabled>
+          Verify and publish
+        </button>
+        <button class="bc-btn" id="unpublishBtn" hidden>Unpublish</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="/live">Live standings</a></li>
+          <li><a class="f-link" href="/results">Results</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Broadcast">
+        <h2 class="footer-heading">Broadcast</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="/admin/matches">Matches</a></li>
+          <li><a class="f-link" href="/admin/overlays">Overlays</a></li>
+          <li><a class="f-link" href="/admin/caster">Caster</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="/rules">Code of conduct / Fair play</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script src="js/nav.js?v=1"></script>
+  <script src="js/admin-shell.js?v=1"></script>
+  <script src="js/control.js?v=1"></script>
+</body>
+</html>

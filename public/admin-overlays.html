@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overlays — BGMI Cup Producer</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0d10'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='bold' fill='%23b6ff3e' text-anchor='middle'%3EO%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css?v=5">
+  <link rel="stylesheet" href="css/control.css?v=1">
+  <link rel="stylesheet" href="css/footer.css?v=1">
+</head>
+<body>
+
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== NAV ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">BGMI<em>//</em>CUP<b>.26</b></a>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link" href="/admin">Control Room</a>
+        <a class="nav-link" href="/admin/matches">Matches</a>
+        <a class="nav-link" href="/admin/control">Match desk</a>
+        <a class="nav-link" href="/admin/caster">Caster</a>
+        <a class="btn-outline btn-sm nav-cta nav-link" id="logoutNavBtn" href="#">Log out</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+  <div class="nav-overlay hidden" id="navOverlay"></div>
+
+  <!-- ========== PRODUCER ========== -->
+  <main class="pan" id="top" style="max-width:1400px;">
+    <header class="bc-head">
+      <div>
+        <div class="bc-eyebrow">broadcast &mdash; producer</div>
+        <h1 class="bc-title">Overlays</h1>
+        <p class="bc-user">signed in as <b id="whoAmI">&hellip;</b></p>
+      </div>
+      <div class="bc-actions">
+        <a class="bc-btn" href="/admin/control">Match desk &rarr;</a>
+      </div>
+    </header>
+
+    <!-- token + theme -->
+    <section class="bc-card">
+      <h2 class="bc-h2">Access &amp; theme</h2>
+      <p class="bc-p">Every overlay URL carries this secret token. Rotating it instantly cuts off the old URLs &mdash; re-copy them into OBS afterwards.</p>
+      <div class="bc-form-row">
+        <div style="flex:1; min-width:260px;">
+          <label class="bc-label" for="tokenField">Overlay token</label>
+          <input class="bc-input" id="tokenField" readonly>
+        </div>
+        <button class="bc-btn bc-btn--no" id="rotateBtn">Rotate token</button>
+      </div>
+      <div class="bc-form-row">
+        <div>
+          <label class="bc-label" for="themeField">Theme colour</label>
+          <input class="bc-input bc-input--mini" id="themeField" type="color" value="#b6ff3e" style="height:36px;padding:2px;">
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="bc-label" for="logoField">Logo path <span class="bc-dim">(/uploads/… or https://…)</span></label>
+          <input class="bc-input" id="logoField" placeholder="/uploads/event-logo.png">
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <label class="bc-label" for="sponsorField">Sponsor line</label>
+          <input class="bc-input" id="sponsorField" maxlength="120" placeholder="Presented by …">
+        </div>
+        <button class="bc-btn bc-btn--go" id="saveThemeBtn">Save</button>
+      </div>
+      <div class="bc-notice hidden" id="themeNotice" role="status"></div>
+    </section>
+
+    <!-- preview -->
+    <section class="bc-card">
+      <h2 class="bc-h2">Preview</h2>
+      <div class="bc-form-row">
+        <div>
+          <label class="bc-label" for="previewPick">Overlay</label>
+          <select class="bc-select" id="previewPick" style="width:auto;"></select>
+        </div>
+        <span class="bc-p" style="margin:0;">scaled from a 1920&times;1080 canvas &mdash; exactly what OBS sees</span>
+      </div>
+      <div class="bc-preview" id="previewBox"><iframe id="previewFrame"
+        title="Overlay preview" scrolling="no"></iframe></div>
+    </section>
+
+    <!-- overlay cards -->
+    <section style="margin-top:18px;">
+      <h2 class="bc-h2">Browser sources</h2>
+      <p class="bc-p">Add each URL as a Browser source in OBS: 1920&times;1080, custom CSS empty, "Shutdown source when not visible" off.</p>
+      <div class="bc-overlay-grid" id="overlayGrid"></div>
+    </section>
+  </main>
+
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="/live">Live standings</a></li>
+          <li><a class="f-link" href="/results">Results</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Broadcast">
+        <h2 class="footer-heading">Broadcast</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="/admin/matches">Matches</a></li>
+          <li><a class="f-link" href="/admin/control">Match desk</a></li>
+          <li><a class="f-link" href="/admin/caster">Caster</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="/rules">Code of conduct / Fair play</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script src="js/nav.js?v=1"></script>
+  <script src="js/admin-shell.js?v=1"></script>
+  <script src="js/overlays.js?v=1"></script>
+</body>
+</html>

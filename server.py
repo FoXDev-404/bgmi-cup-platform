@@ -1641,6 +1641,10 @@ class Handler(BaseHTTPRequestHandler):
                 pushed = json.loads(pairs.get("pushed_card") or "null")
             except ValueError:
                 pushed = None
+            try:
+                disabled = json.loads(pairs.get("disabled") or "[]")
+            except ValueError:
+                disabled = []
             return self.send_json({
                 "ok": True,
                 "token": pairs.get("token", ""),
@@ -1649,6 +1653,7 @@ class Handler(BaseHTTPRequestHandler):
                 "sponsorText": pairs.get("sponsor_text", ""),
                 "introTeam": pairs.get("intro_team", ""),
                 "pushedCard": pushed,
+                "disabled": disabled,
                 "overlays": list(broadcast.OVERLAY_NAMES)})
         if rest == "scoring-rules":
             with DB_LOCK:
@@ -2474,6 +2479,11 @@ class Handler(BaseHTTPRequestHandler):
                             broadcast.set_bsetting(
                                 conn, "pushed_card",
                                 json.dumps(card)[:2000])
+                    if "disabled" in data:
+                        names = [n for n in (data.get("disabled") or [])
+                                 if n in broadcast.OVERLAY_NAMES][:20]
+                        broadcast.set_bsetting(conn, "disabled",
+                                               json.dumps(names))
                     audit(conn, who, None, "overlay_settings",
                           new=str(sorted(k for k in data)))
                     conn.commit()

@@ -125,8 +125,8 @@
         var n = x.d.state.match.match_number;
         BC.toast('Match ' + n + ' created');
         $('newNotes').value = '';
-        load();
-        openCheckin(x.d.state.match.id);
+        var newId = x.d.state.match.id;
+        load().then(function () { openCheckin(newId); });
       } else {
         BC.toast(x.d.error || 'Create failed', true);
       }
@@ -237,7 +237,7 @@
   /* ---- boot -------------------------------------------------------------- */
 
   function load() {
-    BC.api('/api/admin/matches').then(function (x) {
+    return BC.api('/api/admin/matches').then(function (x) {
       if (x.s !== 200 || !x.d.ok) return;
       matches = x.d.matches;
       groups = x.d.groups;

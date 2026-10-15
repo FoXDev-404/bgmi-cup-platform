@@ -43,6 +43,8 @@ Status key: **Done** = code + tests verified by running · **Partial** = impleme
        live 4/4 → 3/4 without reload (SSE), auto-placement + event log correct.
        Concurrency check: desk + `/live` + teams-alive + live-leaderboard overlays open together —
        one SSE stream each, all four update after a desk action, nothing blocks.
+       Triggered overlays: elimination-popup fires from a desk squad wipe; team-intro appears when the
+       producer pins a team (`introTeam` setting). Both captured live (qa-shots/overlay-*-live.png).
        Bug found & fixed in the dry run: broadcast admin pages used relative asset/link paths, so the
        pretty URLs `/admin/<page>` served them unstyled with 404 CSS/JS (commit `973e943` — now
        root-absolute, matching `overlay.html`'s pattern).

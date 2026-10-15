@@ -51,10 +51,10 @@
       </div>
     </header>
 
-    <!-- token + theme -->
+    <!-- token + branding -->
     <section class="bc-card">
-      <h2 class="bc-h2">Access &amp; theme</h2>
-      <p class="bc-p">Every overlay URL carries this secret token. Rotating it instantly cuts off the old URLs &mdash; re-copy them into OBS afterwards.</p>
+      <h2 class="bc-h2">Access &amp; branding</h2>
+      <p class="bc-p">These are the original broadcast overlay scenes. Every overlay URL carries this secret token &mdash; rotating it instantly cuts off the old URLs, so re-copy them into OBS afterwards.</p>
       <div class="bc-form-row">
         <div style="flex:1; min-width:260px;">
           <label class="bc-label" for="tokenField">Overlay token</label>
@@ -63,17 +63,9 @@
         <button class="bc-btn bc-btn--no" id="rotateBtn">Rotate token</button>
       </div>
       <div class="bc-form-row">
-        <div>
-          <label class="bc-label" for="themeField">Theme colour</label>
-          <input class="bc-input bc-input--mini" id="themeField" type="color" value="#b6ff3e" style="height:36px;padding:2px;">
-        </div>
         <div style="flex:1; min-width:220px;">
-          <label class="bc-label" for="logoField">Logo path <span class="bc-dim">(/uploads/… or https://…)</span></label>
+          <label class="bc-label" for="logoField">Event logo <span class="bc-dim">(stream-start scene; /uploads/… or https://…)</span></label>
           <input class="bc-input" id="logoField" placeholder="/uploads/event-logo.png">
-        </div>
-        <div style="flex:1; min-width:200px;">
-          <label class="bc-label" for="sponsorField">Sponsor line</label>
-          <input class="bc-input" id="sponsorField" maxlength="120" placeholder="Presented by …">
         </div>
         <button class="bc-btn bc-btn--go" id="saveThemeBtn">Save</button>
       </div>

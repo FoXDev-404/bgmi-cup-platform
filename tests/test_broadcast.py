@@ -244,14 +244,15 @@ def main():
     st, cfg = j("GET", "/api/admin/overlay-settings", headers=T.ah())
     token = cfg.get("token", "")
     report("overlay token issued (32+ chars)", len(token) >= 32, str(len(token)))
-    st, d = j("GET", "/api/overlay/state/live-leaderboard")
+    st, d = j("GET", "/api/overlay/state/live")
     report("overlay state without token is 403", st == 403, "status=%s" % st)
-    st, d = j("GET", "/api/overlay/state/live-leaderboard?token=bogus")
+    st, d = j("GET", "/api/overlay/state/live?token=bogus")
     report("overlay state with wrong token is 403", st == 403, "status=%s" % st)
     st, d = j("GET",
-              "/api/overlay/state/live-leaderboard?token=" + token)
+              "/api/overlay/state/live?token=" + token)
     report("overlay state with valid token is 200",
-           st == 200 and d.get("name") == "live-leaderboard",
+           st == 200 and d.get("name") == "live"
+           and isinstance((d.get("state") or {}).get("teams"), list),
            "status=%s body=%s" % (st, str(d)[:120]))
     report("overlay payload carries no PII", no_pii(json.dumps(d)),
            "payload leaked PII")
@@ -304,10 +305,10 @@ def main():
             s.close()
 
     st, body = sse_first_bytes(
-        "/api/overlay/stream/live-leaderboard?token=" + token)
+        "/api/overlay/stream/live?token=" + token)
     report("overlay SSE stream answers with the token",
            st == 200 and b"connected" in body, "status=%s" % st)
-    st, _ = T.http("GET", "/api/overlay/stream/live-leaderboard")
+    st, _ = T.http("GET", "/api/overlay/stream/live")
     report("overlay SSE stream refuses without token (403)", st == 403,
            "status=%s" % st)
     # rotation invalidates the old token everywhere at once
@@ -316,19 +317,19 @@ def main():
     new_token = d.get("token", "")
     report("token rotates to a different value",
            st == 200 and new_token and new_token != token, str(d)[:120])
-    st, _ = j("GET", "/api/overlay/state/live-leaderboard?token=" + token)
+    st, _ = j("GET", "/api/overlay/state/live?token=" + token)
     report("old token is dead after rotation", st == 403, "status=%s" % st)
-    st, d = j("GET", "/api/overlay/state/live-leaderboard?token=" + new_token)
+    st, d = j("GET", "/api/overlay/state/live?token=" + new_token)
     report("new token works after rotation", st == 200, "status=%s" % st)
     token = new_token
 
     # ---------- overlay show/hide + theme ----------
     st, d = j("POST", "/api/admin/overlay-settings",
-              {"themeColor": "#ff00aa", "disabled": ["break-screen"]},
+              {"themeColor": "#ff00aa", "disabled": ["intermission"]},
               headers=T.ah())
     report("theme color + disable switch saved",
            st == 200 and d.get("themeColor") == "#ff00aa", str(d)[:120])
-    st, d = j("GET", "/api/overlay/state/break-screen?token=" + token)
+    st, d = j("GET", "/api/overlay/state/intermission?token=" + token)
     report("disabled overlay reports disabled=true",
            st == 200 and d.get("disabled") is True, str(d)[:120])
     st, d = j("POST", "/api/admin/overlay-settings",
@@ -494,7 +495,7 @@ def main():
                "uid" not in json.dumps(live).lower())
         st, cfg = j("GET", "/api/admin/overlay-settings", headers=T.ah())
         tok = (cfg or {}).get("token", "")
-        st, ov = j("GET", "/api/overlay/state/live-leaderboard?token=%s" % tok)
+        st, ov = j("GET", "/api/overlay/state/live?token=%s" % tok)
         report("overlay payload carries no UIDs",
                st == 200 and "uid" not in json.dumps(ov).lower(),
                "status=%s" % st)
@@ -672,18 +673,21 @@ def main():
                                            "placement": {}}, headers=T.ah())
     report("scoring rules restored to defaults", True)
 
-    # ---------- pushed stat card (caster -> mvp-card) ----------
+    # ---------- pushed stat card (caster desk, kept server-side) ----------
     print("\n[caster push]")
     st, d = j("POST", "/api/admin/overlay-settings",
               {"pushedCard": {"player": "TESTER", "teamName": "T",
                               "teamTag": "T", "kills": 9, "damage": 1234}},
               headers=T.ah())
     report("stat card pushed", st == 200, str(d)[:120])
-    st, d = j("GET", "/api/overlay/state/mvp-card?token=" + token)
-    card = (d.get("data") or {}).get("card") or {}
-    report("mvp-card overlay serves the pushed card",
-           st == 200 and card.get("player") == "TESTER"
-           and (d.get("data") or {}).get("mode") == "caster",
+    st, cfg = j("GET", "/api/admin/overlay-settings", headers=T.ah())
+    card = cfg.get("pushedCard") or {}
+    report("pushed card round-trips to the caster desk",
+           st == 200 and card.get("player") == "TESTER", str(cfg)[:160])
+    st, d = j("GET", "/api/overlay/state/mvp?token=" + token)
+    report("original mvp scene serves the legacy payload",
+           st == 200 and isinstance((d.get("state") or {}).get("playerStats"),
+                                    dict),
            str(d)[:160])
     j("POST", "/api/admin/overlay-settings", {"pushedCard": None},
       headers=T.ah())

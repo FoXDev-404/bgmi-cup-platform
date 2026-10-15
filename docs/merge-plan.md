@@ -169,6 +169,10 @@ B's login/register pages, dev bypass, `data/*.json` store.
 `break-screen`, `sponsor-bug`. All update instantly via SSE; all respect
 `prefers-reduced-motion`; none can render email/phone/UID (payloads strip them).
 
+> Superseded in R2-2: production now serves the ORIGINAL broadcast app's
+> 16 scenes (`pre-show` … `hidden`) as-is — see docs/merge-progress.md R2-2
+> for the served list and the scenes that were not carried over.
+
 ## 7. Security
 
 - One login, one session store, one CSRF scheme (A's). New admin APIs:

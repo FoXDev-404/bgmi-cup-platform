@@ -15,12 +15,22 @@ Requested follow-ups after the merge dry run. Safety: demo/seed DB only (backup 
        stats kept, undo restores the four), `/api/live/state` strips uid+bench, bench list in desk state.
        13 new checks: 4-per-squad, swap + logs + undo, refusal of an already-playing sub,
        DB guard (5th insert aborts), legacy repair keeps rows, no benched/UID data on /live or overlays.
-- [ ] R2-2. Old broadcast overlays served as-is — **Not started**
-       restore original `overlay.html/.css/.js` (+ assets) from `b91ccef:broadcast-src/`,
-       serve at `/overlay/<scene>` with token gate; tiny `/socket.io/socket.io.js` shim →
-       SSE (`/api/overlay/legacy/stream|state`) + 2 s poll fallback; server-side adapter
-       `legacy_state()` maps merged DB → B's `tournament:update` shape (numeric ids, uid
-       stripped); list requested overlays missing from the old 16-scene set; screenshots.
+- [x] R2-2. Old broadcast overlays served as-is — **Done**
+       `public/overlay.{html,css,js}` restored byte-identical from
+       `b91ccef:broadcast-src/` (+ 6 assets at `/assets/` root); served at
+       `/overlay/<scene>` for the original 16-scene set; `public/socket.io/
+       socket.io.js` shim bridges `io()` to SSE (`/api/overlay/stream|state/
+       <scene>`) with a 2 s polling fallback; server-side `legacy_state()`
+       rebuilds B's `tournament:update` payload from the merged DB (numeric
+       team ids, `out`→`eliminated`, uid/PII stripped); the scene pin comes
+       from the URL path — 1-line edit in `overlay.js`, the only change to
+       any overlay file; producer page lists the 16 scenes; the caster push
+       now lives server-side only (no card scene).
+       Missing vs the old themed set, **not created**: `teams-alive`,
+       `team-status-strip`, `elimination-popup`, `team-intro`, `sponsor-bug`
+       (`break-screen` → `intermission`).
+       Verified: suites 108/104/94, Playwright 8/8, visual smoke green with
+       16/16 scene screenshots (qa-shots/overlay-*.png) on demo data.
 - [ ] R2-3. Control desk team card rebuilt to the reference layout — **Not started**
        slot badge / tag / name+group / FIN·PLACE·PTS / chevron; control row (+FINISH, −,
        PLACE stepper, AUTO, gear → swap, manual adjustment with reason, reset team);

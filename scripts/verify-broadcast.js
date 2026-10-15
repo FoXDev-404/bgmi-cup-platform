@@ -39,20 +39,21 @@ fs.mkdirSync(OUT, { recursive: true });
     { env: process.env, cwd: path.resolve(__dirname, '..') }).toString().trim();
   const ov = await browser.newPage();
   ov.on('pageerror', (e) => problems.push(`overlay pageerror ${e}`));
-  for (const name of ['live-leaderboard', 'teams-alive', 'team-status-strip',
-                      'match-results', 'overall-standings', 'chicken-dinner',
-                      'break-screen', 'sponsor-bug', 'mvp-card', 'elimination-popup',
-                      'team-intro']) {
+  const SCENES = ['pre-show', 'stream-start', 'countdown', 'caster', 'format',
+                  'lineup', 'live', 'chicken-dinner', 'frag-leaders', 'results',
+                  'overall', 'mvp', 'map-feed', 'intermission',
+                  'technical-difficulties', 'hidden'];
+  for (const name of SCENES) {
     await ov.setViewportSize({ width: 1920, height: 1080 });
     await ov.goto(`${BASE}/overlay/${name}?token=${tokenOut}`, { waitUntil: 'load' });
     await ov.waitForTimeout(500);
     await ov.screenshot({ path: path.join(OUT, 'overlay-' + name + '.png') });
-    const html = await ov.locator('#scene').innerHTML();
+    const html = await ov.locator('#broadcast').innerHTML();
     console.log(`overlay ${name}: ${html.length} chars of scene`);
   }
 
   // overlay without token must serve the shell but fetch 403 (no data leaks)
-  await ov.goto(`${BASE}/overlay/live-leaderboard`, { waitUntil: 'load' });
+  await ov.goto(`${BASE}/overlay/live`, { waitUntil: 'load' });
   const bodyText = await ov.locator('body').innerText();
   if (/cap\d@demo\.invalid|9\d{8}/.test(bodyText)) problems.push('PII visible on overlay shell');
 
@@ -75,6 +76,8 @@ fs.mkdirSync(OUT, { recursive: true });
         && r.status() === 200, { timeout: 15000 }),
       adm.click('#loginBtn'),
     ]);
+    // let the login page finish its own redirect to /admin first
+    await adm.waitForSelector('#logoutNavBtn', { timeout: 15000 });
     for (const p of ['/admin/matches', '/admin/control', '/admin/overlays', '/admin/caster']) {
       await adm.goto(BASE + p, { waitUntil: 'load' });
       // fail loudly if we were bounced to the login page

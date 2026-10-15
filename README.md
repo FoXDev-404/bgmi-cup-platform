@@ -6,15 +6,16 @@ One project, one server, one database, one login, one theme. Two sections:
    status lookup, approved-teams grid, schedule, and a full admin approval
    workflow (Control Room).
 2. **Broadcast** — match schedule, live control desk (kills, damage, status,
-   placements, undo), public live/results pages, 11 OBS browser-source
-   overlays, and a caster dashboard — all driven from the same approved teams
+   placements, undo), public live/results pages, 16 original OBS
+   browser-source overlays, and a caster dashboard — all driven from the same approved teams
    and groups (the registration section is the single source of truth).
 
 **Stack:** Python 3 standard library only — no pip packages, no build step,
 one SQLite database (`data/registrations.db`). Minimum Python **3.7**
 (`ThreadingHTTPServer`; verified on 3.10). Playwright + Chromium only for the
 browser tests. Real-time updates use **Server-Sent Events** with a polling
-fallback — no Socket.IO, no Node server.
+fallback — no Socket.IO, no Node server (the original overlay pages
+talk to a tiny bridge at `/socket.io/socket.io.js`).
 
 ## Layout
 
@@ -27,11 +28,12 @@ public/              Web root
                      results, about, 404, privacy)
   admin*.html        Admin pages (dashboard, matches, control desk,
                      overlays producer, caster)
-  overlay.html       Single transparent shell served for /overlay/<name>
+  overlay.html       Original broadcast overlay shell — /overlay/<scene>
+  overlay.css/.js    Original overlay styles + 16 scene renderers (as-is)
+  socket.io/         socket.io.js shim — bridges the overlays to SSE
   css/               style.css (theme), admin.css, footer.css, control.css
-                     (broadcast admin), overlay.css (OBS scenes)
-  js/                nav.js, admin-shell.js (BC bootstrap), per-page scripts,
-                     overlay.js (11 scene renderers)
+                     (broadcast admin)
+  js/                nav.js, admin-shell.js (BC bootstrap), per-page scripts
   assets/, images/   Vendor libs + imagery
 scripts/             create_admin.py, seed_demo.py, backup_db.py, restore_db.py
 tests/               test_api.py, test_admin.py, broadcast specs (Playwright)
@@ -73,7 +75,7 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
 | `/live` | Live match centre (SSE) |
 | `/results` | Standings, group tables, match results |
 | `/about` · `/privacy.html` · `/rules` | Info pages |
-| `/overlay/<name>` | OBS overlay scene (token-gated data) |
+| `/overlay/<scene>` | Original OBS overlay scene (token-gated data) |
 | `/standings` · `/operator` · `/login` | Legacy redirects → `/results` · `/admin/control` · `/admin` |
 
 **Admin** (one session + CSRF, gated server-side on every route):
@@ -83,7 +85,7 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
 | `/admin` | Registration approval dashboard |
 | `/admin/matches` | Match schedule + check-in + scoring rules |
 | `/admin/control` | Match Control Desk (drive a live match) |
-| `/admin/overlays` | Overlay producer (URLs, token, on/off, preview) |
+| `/admin/overlays` | Overlay producer (URLs, token, event logo, preview) |
 | `/admin/caster` | Caster dashboard + push-stat-card |
 
 **API:** registration/status endpoints (see [docs/api.md](docs/api.md)) plus
@@ -103,10 +105,11 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
    `R` refresh.
 4. **Verify and publish** (gated: every squad needs a placement) — points
    flow into standings, `/live`, `/results` and the overlays immediately.
-5. `/admin/overlays` → copy the 11 overlay URLs into OBS browser sources
+5. `/admin/overlays` → copy the 16 overlay URLs into OBS browser sources
    (1920×1080, transparent). Each URL carries a rotatable token.
-6. `/admin/caster` → standings + push any player's stat card onto the
-   `mvp-card` overlay for 90 seconds.
+6. `/admin/caster` → standings + push any player's stat card; the pushed
+   card shows on the caster desk (the original overlay set has no card
+   scene — see docs/merge-progress.md R2-2 for the missing-scene list).
 
 Scoring: placement points `{1:10, 2:6, 3:5, 4:4, 5:3, 6:2, 7:1, 8:1}` + 1 pt
 per kill (tunable on `/admin/matches`). Tie-breakers: points → wins →
@@ -168,8 +171,8 @@ the overlay token is generated into the database and rotatable from
 2. URL: copy from `/admin/overlays` (each contains `?token=…`); width
    `1920`, height `1080`; leave "Shutdown source when not visible" off so
    SSE reconnects cleanly.
-3. Backgrounds are transparent — safe to stack. The producer's on/off switch
-   hides an overlay everywhere (stored server-side).
+3. Backgrounds are transparent — safe to stack. Load the `hidden` scene on
+   any source to blank it.
 4. Rotating the token on `/admin/overlays` invalidates every copied URL at
    once — paste the new URLs into OBS after rotating.
 

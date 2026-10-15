@@ -1,24 +1,28 @@
-/* Overlay producer — enable/show overlays, theme, token, preview + copy. */
+/* Overlay producer — the original broadcast scenes, token, URLs + preview. */
 (function () {
   'use strict';
   var esc = BC.esc;
   var $ = function (id) { return document.getElementById(id); };
 
   var cfg = null;            // overlay-settings payload
-  var disabled = {};
 
   var OVERLAY_BLURB = {
-    'live-leaderboard': 'Rolling points table for the live lobby.',
-    'teams-alive': 'Big squads-standing counter for tense moments.',
-    'team-status-strip': 'Compact alive/knocked/out strip along an edge.',
-    'elimination-popup': 'Slides in on every squad wipe.',
-    'match-results': 'Final placements of the last published match.',
-    'overall-standings': 'Tournament leaderboard with tie-breakers.',
-    'team-intro': 'Lower-third squad intro with roster.',
-    'chicken-dinner': 'Winner slate with MVP line.',
-    'mvp-card': 'Player stat card — auto match MVP or caster push.',
-    'break-screen': 'Break slate with sponsor line.',
-    'sponsor-bug': 'Persistent corner sponsor bug.'
+    'pre-show': 'Standby slate before the stream opens.',
+    'stream-start': 'Stream starting soon screen with the event logo.',
+    'countdown': 'Full-screen drop-in countdown clock.',
+    'caster': 'Caster name card with photo and tagline.',
+    'format': 'Tournament format and schedule panel.',
+    'lineup': 'Teams dropping in, squad by squad.',
+    'live': 'Live squad status board — rank, FIN, PTS, alive bars.',
+    'chicken-dinner': 'Winner panel for the latest result.',
+    'frag-leaders': 'Top five frag leaders with damage.',
+    'results': 'Match results table with the winner panel.',
+    'overall': 'Overall tournament standings.',
+    'mvp': 'Player spotlight (match MVP or overall top fragger).',
+    'map-feed': 'Tactical map feed frame.',
+    'intermission': 'Match break slate.',
+    'technical-difficulties': 'Technical difficulties slate.',
+    'hidden': 'Blank slate — no graphics (standby).'
   };
 
   function urlFor(name) {
@@ -30,15 +34,12 @@
 
   function render() {
     $('overlayGrid').innerHTML = cfg.overlays.map(function (name) {
-      var off = !!disabled[name];
-      return '<article class="bc-overlay' + (off ? ' bc-overlay--off' : '') + '">' +
+      return '<article class="bc-overlay">' +
         '<div class="bc-overlay-name">' + esc(name) + '</div>' +
         '<p class="bc-p" style="margin:0;">' + esc(OVERLAY_BLURB[name] || '') + '</p>' +
         '<div class="bc-overlay-url" id="url-' + esc(name) + '">' +
         esc(urlFor(name)) + '</div>' +
         '<div class="bc-overlay-acts">' +
-        '<label class="bc-toggle"><input type="checkbox" data-toggle="' +
-        esc(name) + '"' + (off ? '' : ' checked') + '> on air</label>' +
         '<button class="bc-btn" data-copy="' + esc(name) + '">Copy URL</button>' +
         '<button class="bc-btn" data-preview="' + esc(name) + '">Preview</button>' +
         '</div></article>';
@@ -61,23 +62,6 @@
       b.addEventListener('click', function () {
         $('previewPick').value = b.dataset.preview;
         loadPreview();
-      });
-    });
-    $('overlayGrid').querySelectorAll('[data-toggle]').forEach(function (c) {
-      c.addEventListener('change', function () {
-        var names = [];
-        $('overlayGrid').querySelectorAll('[data-toggle]').forEach(function (x) {
-          if (!x.checked) names.push(x.dataset.toggle);
-        });
-        BC.post('/api/admin/overlay-settings', { disabled: names }).then(function (x) {
-          if (x.s === 200 && x.d.ok) {
-            disabled = {};
-            names.forEach(function (n) { disabled[n] = true; });
-            render();
-            BC.toast(names.length ? names.length + ' overlays hidden'
-              : 'All overlays on air');
-          } else BC.toast(x.d.error || 'Save failed', true);
-        });
       });
     });
   }
@@ -116,12 +100,8 @@
     BC.api('/api/admin/overlay-settings').then(function (x) {
       if (x.s !== 200 || !x.d.ok) return;
       cfg = x.d;
-      disabled = {};
-      (cfg.disabled || []).forEach(function (n) { disabled[n] = true; });
       $('tokenField').value = cfg.token;
-      $('themeField').value = cfg.themeColor;
       $('logoField').value = cfg.logoPath;
-      $('sponsorField').value = cfg.sponsorText;
       if ($('previewPick').options.length !== cfg.overlays.length) {
         $('previewPick').innerHTML = cfg.overlays.map(function (n) {
           return '<option value="' + esc(n) + '">' + esc(n) + '</option>';
@@ -134,12 +114,10 @@
 
   $('saveThemeBtn').addEventListener('click', function () {
     BC.post('/api/admin/overlay-settings', {
-      themeColor: $('themeField').value,
-      logoPath: $('logoField').value.trim(),
-      sponsorText: $('sponsorField').value.trim()
+      logoPath: $('logoField').value.trim()
     }).then(function (x) {
       if (x.s === 200 && x.d.ok) {
-        BC.toast('Theme saved');
+        BC.toast('Saved');
         load();
       } else BC.toast(x.d.error || 'Save failed', true);
     });

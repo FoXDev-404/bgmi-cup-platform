@@ -32,10 +32,12 @@ MAPS = ("Erangel", "Miramar", "Sanhok", "Livik", "Vikendi")
 PLAYER_STATUSES = ("alive", "knocked", "out")
 MATCH_STATUSES = ("upcoming", "live", "awaiting_verification", "published")
 
-OVERLAY_NAMES = ("live-leaderboard", "teams-alive", "team-status-strip",
-                 "elimination-popup", "match-results", "overall-standings",
-                 "team-intro", "chicken-dinner", "mvp-card", "break-screen",
-                 "sponsor-bug")
+# R2-2: the overlay set is the original broadcast app's scene list (one page,
+# scene switched by URL pin / broadcast_scene). Served under /overlay/<name>.
+OVERLAY_NAMES = ("pre-show", "stream-start", "countdown", "caster", "format",
+                 "lineup", "live", "chicken-dinner", "frag-leaders", "results",
+                 "overall", "mvp", "map-feed", "intermission",
+                 "technical-difficulties", "hidden")
 
 # B's defaults (server.js:60,77) — placement 1..8, everything below = 0.
 DEFAULT_PLACEMENT_POINTS = {1: 10, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 1}
@@ -49,6 +51,7 @@ DEFAULT_OVERLAY_SETTINGS = {
     "intro_team": "",            # team_id pinned on the team-intro overlay
     "pushed_card": "",           # JSON card pushed from the caster desk
     "disabled": "",              # JSON list of hidden overlay names
+    "broadcast_scene": "live",   # fallback scene for an unpinned overlay page
 }
 
 DEFAULT_SCORING_RULES = dict(
@@ -1137,30 +1140,6 @@ def live_match(conn):
     return dict(m) if m else None
 
 
-def current_teams_state(conn, match):
-    if not match:
-        return []
-    teams = []
-    for r in _match_teams_rows(conn, match["id"]):
-        pub = team_public_row(conn, r["team_id"], match["group_name"])
-        players = _team_players(conn, match["id"], r["team_id"])
-        alive = sum(1 for p in players if p["status"] == "alive")
-        knocked = sum(1 for p in players if p["status"] == "knocked")
-        outn = sum(1 for p in players if p["status"] == "out")
-        teams.append(dict(pub, kills=r["kills"], placement=r["placement"],
-                          points=r["points"], alive=alive, knocked=knocked,
-                          out=outn,
-                          players=[{"name": p["player_name"],
-                                    "status": p["status"],
-                                    "kills": p["kills"],
-                                    "damage": p["damage"]}
-                                   for p in players]))
-    teams.sort(key=lambda t: (-t["points"],
-                              t["placement"] or 10 ** 6, -t["kills"],
-                              t["teamName"]))
-    return teams
-
-
 def player_leaders(conn, limit=20, include_live=False):
     """Top fraggers by UID aggregation across matches. No UIDs in output."""
     q = ("SELECT ps.player_uid, ps.player_name, SUM(ps.kills) AS kills, "
@@ -1297,88 +1276,180 @@ def live_state(conn):
     }
 
 
+# --- R2-2: legacy overlay adapter ------------------------------------------
+# The pages served at /overlay/<scene> are the ORIGINAL broadcast overlays
+# (public/overlay.{html,css,js}). They render exactly one payload: the old
+# app's `tournament:update` public state. These builders rebuild that shape
+# from the merged database, so no overlay file needs to know about the merge.
+
+LEGACY_STATUS = {"alive": "alive", "knocked": "knocked", "out": "eliminated"}
+
+
+def _row_adjustment(row):
+    """Manual adjustment points (R2-4 column; 0 until it exists)."""
+    try:
+        return int(row["adjustment"] or 0)
+    except (IndexError, KeyError):
+        return 0
+
+
+def legacy_team_ids(conn):
+    """Numeric slot ids for the legacy payload (the old app used ints)."""
+    return {r["team_id"]: i + 1 for i, r in enumerate(conn.execute(
+        "SELECT team_id FROM registrations WHERE status = 'approved' "
+        "ORDER BY team_id"))}
+
+
+def legacy_players(conn, match_id, team_id):
+    rows = _team_players(conn, int(match_id), team_id, active_only=False)
+    return [{"name": p["player_name"],
+             "status": LEGACY_STATUS.get(p["status"], "alive"),
+             "kills": int(p["kills"]), "damage": int(p["damage"]),
+             "avatarUrl": ""} for p in rows]
+
+
+def legacy_state(conn):
+    """The original broadcast app's public state, rebuilt from the merged DB.
+
+    Like the old app's publicState, UIDs are stripped — only team and player
+    display names ever leave this builder."""
+    rules = load_rules(conn)
+    lmap = legacy_team_ids(conn)
+    match = live_match(conn)
+    mrows, mplayers = {}, {}
+    if match:
+        for r in conn.execute(
+                "SELECT * FROM match_team_results WHERE match_id = ?",
+                (match["id"],)):
+            mrows[r["team_id"]] = r
+        for tid in mrows:
+            mplayers[tid] = _team_players(conn, match["id"], tid)
+
+    totals = {r["teamId"]: r
+              for r in standings_rows(conn, None, include_live=True)}
+    teams = []
+    for r in conn.execute(
+            "SELECT team_id FROM registrations WHERE status = 'approved' "
+            "ORDER BY team_id"):
+        tid = r["team_id"]
+        pub = team_public_row(conn, tid)
+        tot = totals.get(tid) or {}
+        row = mrows.get(tid)
+        teams.append({
+            "id": lmap.get(tid, 0), "name": pub["teamName"],
+            "teamName": pub["teamName"], "group": pub["group"] or "A",
+            "logo": pub["logo"], "registered": True,
+            "kills": int(row["kills"]) if row else 0,
+            "placement": int(row["placement"] or 0) if row else 0,
+            "matchPoints": int(row["points"]) if row else 0,
+            "overallPoints": int(tot.get("points") or 0),
+            "overallFinishes": int(tot.get("kills") or 0),
+            "overallMatches": int(tot.get("matches") or 0),
+            "overallWins": int(tot.get("wins") or 0),
+            "overallPlacementPoints": int(tot.get("placementPoints") or 0),
+            "players": [{"name": p["player_name"],
+                         "status": LEGACY_STATUS.get(p["status"], "alive"),
+                         "kills": int(p["kills"]), "damage": int(p["damage"]),
+                         "avatarUrl": ""}
+                        for p in mplayers.get(tid, [])]})
+
+    history = []
+    for m in conn.execute(
+            "SELECT * FROM matches WHERE status = 'published' "
+            "ORDER BY match_number"):
+        results = []
+        for r in conn.execute(
+                "SELECT * FROM match_team_results WHERE match_id = ? "
+                "ORDER BY placement, team_id", (m["id"],)):
+            pub = team_public_row(conn, r["team_id"], m["group_name"])
+            results.append({
+                "teamId": lmap.get(r["team_id"], 0),
+                "teamName": pub["teamName"], "group": m["group_name"],
+                "teamLogo": pub["logo"],
+                "placement": int(r["placement"] or 0),
+                "kills": int(r["kills"]),
+                "matchPoints": int(r["points"]),
+                "placementPoints": (int(r["points"]) - int(r["kills"]) -
+                                    _row_adjustment(r)),
+                "players": legacy_players(conn, m["id"], r["team_id"])})
+        history.append({"matchNumber": m["match_number"],
+                        "group": m["group_name"], "map": m["map"],
+                        "results": results})
+
+    current_leaders = []
+    for tid, players in mplayers.items():
+        pub = team_public_row(conn, tid)
+        for i, p in enumerate(players):
+            current_leaders.append({
+                "teamId": lmap.get(tid, 0), "teamName": pub["teamName"],
+                "teamLogo": pub["logo"], "playerIndex": i,
+                "playerName": p["player_name"], "avatarUrl": "",
+                "kills": int(p["kills"]), "damage": int(p["damage"]),
+                "group": pub["group"] or "A"})
+    current_leaders.sort(key=lambda p: (-p["kills"], p["playerName"].lower()))
+    overall_leaders = [{
+        "teamId": 0, "teamName": r["teamName"], "teamLogo": r["logo"],
+        "playerIndex": 0, "playerName": r["player"], "avatarUrl": "",
+        "kills": r["kills"], "damage": r["damage"], "matches": r["matches"],
+        "group": r["group"]} for r in player_leaders(conn, 30, True)]
+
+    if match:
+        ms = ("verified" if match["status"] == "published" else
+              "live" if match["status"] in ("live", "awaiting_verification")
+              else "upcoming")
+    else:
+        ms = "upcoming"
+
+    return {
+        "tournamentName": "BGMI CUP 26",
+        "organizer": "",
+        "format": "",
+        "currentMatch": match["match_number"] if match else 1,
+        "currentGroup": (match["group_name"] if match else "A") or "A",
+        "currentMap": (match["map"] if match else "Erangel") or "Erangel",
+        "matchStatus": ms,
+        "broadcastState": get_bsetting(conn, "broadcast_scene", "live"),
+        "matchTeamIds": sorted(lmap.get(t, 0) for t in mrows),
+        "teams": teams,
+        "matchHistory": history,
+        "scoringRules": {
+            "finishPoint": rules["kill_points"],
+            "placementPoints": {str(p): int(v)
+                                for p, v in rules["placement"].items()}},
+        "playerStats": {
+            "currentLeaders": current_leaders,
+            "overallLeaders": overall_leaders,
+            "matchMvp": (current_leaders[0]
+                         if current_leaders and current_leaders[0]["kills"] > 0
+                         else None),
+            "overallTopFragger": (overall_leaders[0]
+                                  if overall_leaders
+                                  and overall_leaders[0]["kills"] > 0
+                                  else None)},
+        "production": {
+            "eventLogoUrl": get_bsetting(conn, "logo_path", ""),
+            "themeMusicUrl": "", "mapFeed": {"imageUrl": ""},
+            "caster": {"name": "", "tagline": "", "imageUrl": ""},
+            "mvpMode": "match", "countdownEndsAt": 0, "streamStartEndsAt": 0,
+            "streamStartDurationSeconds": 1200,
+            "broadcastStageLabel": "", "broadcastDayLabel": "",
+            "broadcastGroupLabel": "", "broadcastMatchCaption": ""},
+        "qualification": {"semifinalSlots": 24, "finalSlots": 16},
+        "updatedAt": now_iso(),
+    }
+
+
 def overlay_state(conn, name):
-    """Per-overlay payload (token-gated). Same PII guarantees as live_state."""
+    """Per-scene overlay payload (token-gated). Every scene gets the full
+    legacy state; the page pins its own scene from the URL path. Same PII
+    guarantees as before: no e-mail, phone or UID anywhere in the payload."""
     if name not in OVERLAY_NAMES:
         return None
-    match = live_match(conn)
-    teams = current_teams_state(conn, match)
-    live = match["status"] == "live" if match else False
-    overall = standings_rows(conn, None, include_live=True)
-    published = standings_rows(conn, None, include_live=False)
-    recents = recent_matches(conn, 1)
-    last = recents[0] if recents else None
-    events = event_rows(conn, None, 12)
-    winner = None
-    mvp = None
-    if last and last["results"]:
-        winner = last["results"][0]
-        mvp = match_mvp(conn, {"id": conn.execute(
-            "SELECT id FROM matches WHERE match_number = ?",
-            (last["matchNumber"],)).fetchone()["id"]})
-    intro_team = get_bsetting(conn, "intro_team", "")
-    intro = None
-    if intro_team:
-        pub = team_public_row(conn, intro_team)
-        if pub["teamName"] != "?":
-            roster = [r["ign"] for r in conn.execute(
-                "SELECT ign FROM roster_members WHERE team_id = ? "
-                "AND UPPER(COALESCE(slot, '')) NOT LIKE 'S%' "
-                "AND LOWER(COALESCE(role, '')) NOT LIKE 'sub%' "
-                "ORDER BY slot LIMIT 4", (intro_team,))]
-            intro = dict(pub, roster=roster)
-    data = {
-        "live-leaderboard": {"match": _pub_match(match), "teams": teams,
-                             "live": live},
-        "teams-alive": {"match": _pub_match(match), "live": live,
-                        "teamsAlive": sum(1 for t in teams
-                                          if t["alive"] or t["knocked"]),
-                        "teams": [{"teamName": t["teamName"],
-                                   "teamTag": t["teamTag"],
-                                   "logo": t["logo"],
-                                   "alive": t["alive"],
-                                   "knocked": t["knocked"],
-                                   "out": t["out"]}
-                                  for t in teams]},
-        "team-status-strip": {"match": _pub_match(match), "live": live,
-                              "teams": [{"teamTag": t["teamTag"],
-                                         "teamName": t["teamName"],
-                                         "logo": t["logo"],
-                                         "alive": t["alive"],
-                                         "knocked": t["knocked"],
-                                         "out": t["out"]}
-                                        for t in teams]},
-        "elimination-popup": {"match": _pub_match(match), "live": live,
-                              "lastElimination": next(
-                                  (e for e in event_rows(conn, None, 40)
-                                   if e["type"] == "eliminate"
-                                   and not e["undone"]), None)},
-        "match-results": {"match": last, "results": last["results"] if last else []},
-        "overall-standings": {"rows": overall[:16], "groups":
-                              group_tables(conn, include_live=True)},
-        "team-intro": {"team": intro},
-        "chicken-dinner": {"match": last, "winner": winner, "mvp": mvp},
-        "mvp-card": {"card": pushed_card(conn) or mvp,
-                     "mode": "caster" if pushed_card(conn) else "auto"},
-        "break-screen": {"sponsor": get_bsetting(conn, "sponsor_text", ""),
-                         "schedule": None, "match": _pub_match(match)},
-        "sponsor-bug": {"sponsor": get_bsetting(conn, "sponsor_text", ""),
-                        "logo": get_bsetting(conn, "logo_path", "")},
-    }[name]
-    return {"name": name,
+    state = legacy_state(conn)
+    return {"ok": True, "name": name,
             "themeColor": get_bsetting(conn, "theme_color", "#b6ff3e"),
-            "logo": get_bsetting(conn, "logo_path", ""),
-            "sponsor": get_bsetting(conn, "sponsor_text", ""),
             "disabled": name in disabled_overlays(conn),
-            "data": data, "updatedAt": now_iso()}
-
-
-def _pub_match(match):
-    if not match:
-        return None
-    return {"id": match["id"], "number": match["match_number"],
-            "group": match["group_name"], "map": match["map"],
-            "status": match["status"], "startedAt": match["started_at"]}
+            "updatedAt": state["updatedAt"], "state": state}
 
 
 # ---------------------------------------------------------------------------

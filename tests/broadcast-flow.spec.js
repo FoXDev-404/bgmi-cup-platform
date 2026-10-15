@@ -244,19 +244,19 @@ test('full dry run: approve -> match -> score -> publish -> live/results/overlay
   expect(stateText).not.toMatch(/98\d{8}/);
 
   // ---- 6. overlay gate: bad token 403, good token renders ---------------
-  const bad = await fetch(base + '/api/overlay/state/live-leaderboard?token=nope');
+  const bad = await fetch(base + '/api/overlay/state/live?token=nope');
   expect(bad.status, 'bad overlay token rejected').toBe(403);
 
   const settings = await admin('GET', '/api/admin/overlay-settings');
   const token = settings.data.token;
   expect(token, 'overlay token present').toBeTruthy();
-  const okState = await fetch(base + '/api/overlay/state/live-leaderboard?token=' + token);
+  const okState = await fetch(base + '/api/overlay/state/live?token=' + token);
   expect(okState.status, 'good overlay token accepted').toBe(200);
   expect(await okState.text()).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.-]+/);
 
-  // the overlay shell renders at 1920x1080 transparent
+  // the original overlay shell renders at 1920x1080 transparent
   await page.setViewportSize({ width: 1920, height: 1080 });
-  const resp = await page.goto(base + '/overlay/live-leaderboard?token=' + token);
+  const resp = await page.goto(base + '/overlay/live?token=' + token);
   expect(resp ? resp.status() : 0).toBe(200);
-  await expect(page.locator('body')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#broadcast')).toBeVisible({ timeout: 15000 });
 });

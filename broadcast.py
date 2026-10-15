@@ -1027,6 +1027,9 @@ def disabled_overlays(conn):
     return [n for n in names if n in OVERLAY_NAMES]
 
 
+PUSH_CARD_TTL = 90          # seconds a caster-pushed stat card stays on air
+
+
 def pushed_card(conn):
     raw = get_bsetting(conn, "pushed_card", "")
     if not raw:
@@ -1037,7 +1040,7 @@ def pushed_card(conn):
         return None
     if not isinstance(card, dict):
         return None
-    if time.time() - float(card.get("at") or 0) > 90:
+    if time.time() - float(card.get("at") or 0) > PUSH_CARD_TTL:
         return None      # stale cards fade out on their own
     card.pop("at", None)
     return card

@@ -2496,6 +2496,12 @@ class Handler(BaseHTTPRequestHandler):
                         if card is None:
                             broadcast.set_bsetting(conn, "pushed_card", "")
                         else:
+                            # stamp the push time server-side: pushed_card()
+                            # expires cards after PUSH_CARD_TTL seconds, and a
+                            # client-supplied timestamp could never be trusted
+                            if isinstance(card, dict):
+                                card = dict(card)
+                                card["at"] = time.time()
                             broadcast.set_bsetting(
                                 conn, "pushed_card",
                                 json.dumps(card)[:2000])

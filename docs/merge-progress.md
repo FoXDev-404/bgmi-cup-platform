@@ -78,7 +78,21 @@ Requested follow-ups after the merge dry run. Safety: demo/seed DB only (backup 
        totals, CSV shape + gating), test_api 104, test_admin 94, Playwright 8/8,
        plus a matches-page UI dry run (chips load, reorder saves round-trip,
        empty list refused — state restored).
-- [ ] R2-5. Dry run + screenshots + report — **Not started**
+- [x] R2-5. Dry run + screenshots + report — **Done**
+       `scripts/dry-run.js` (committed) runs the whole journey on a match it
+       creates itself (Group A, checked in via API, started via the desk UI):
+       exactly 4 players per card, FINISH / kill / damage / statuses, a +2
+       adjustment with reason, wipes AUTO-seated 4→3→2→1, publish gating,
+       duplicate-placement `PLACE TAKEN`, publish — then baseline-relative
+       assertions (history before/after) on `/api/live/state`, `/live`,
+       `/results` and the overlay payloads (match points, placements,
+       `placementPoints` excluding the adjustment, no UID/email leak):
+       **27/27 checks, exit 0**. Screenshots (qa-shots/, gitignored):
+       `r25-desk-1440|390`, `r25-desk-published`, `r25-live-1440`,
+       `r25-results-1440`, `r25-overlay-{overall,results,map-feed,live}`; the
+       full 16-scene overlay set + admin pages re-run green on the same code.
+       Round-2 report: `docs/merge-report-r2.md`. App code unchanged since
+       R2-4, so those suites stand (139/104/94, Playwright 8/8).
 
 Verified by running (2026-10-15): `python tests/test_api.py` (104 ✓), `python tests/test_admin.py` (94 ✓),
 `python tests/test_broadcast.py` (94 ✓), `npx playwright test` (8 ✓ after `npx playwright install chromium`),

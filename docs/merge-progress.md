@@ -1,7 +1,7 @@
 # Merge Progress — Registration Site + BGMI Broadcast
 
 Verified by running (2026-10-15): `python tests/test_api.py` (104 ✓), `python tests/test_admin.py` (94 ✓),
-`python tests/test_broadcast.py` (94 ✓), `npx playwright test` (7 ✓ after `npx playwright install chromium`),
+`python tests/test_broadcast.py` (94 ✓), `npx playwright test` (8 ✓ after `npx playwright install chromium`),
 plus an HTTP smoke pass on a temp seeded DB (all public/admin/overlay routes 200, bad overlay token → 403).
 
 Status key: **Done** = code + tests verified by running · **Partial** = implemented, verification pending · **Not started**
@@ -30,20 +30,27 @@ Status key: **Done** = code + tests verified by running · **Partial** = impleme
        (admin-shell.js) / 8 s freshness poll (live.js); cleanup on broken pipe in broadcast.py.
 - [x] 9. Cleanup — **Done**
        broadcast-src/ removed; unified README + .env.example + .gitignore (qa-shots, graft, data/,
-       uploads, .env); seed_demo.py with --clean; shared js/nav.js (no duplicated inline navbar).
+       uploads, .env); seed_demo.py with --clean; shared js/nav.js (no duplicated inline navbar);
+       scripts/verify-broadcast.js kept as the repeatable visual smoke (public + overlays + admin pass).
        Note: seed_demo.py requires schema first — README documents `python -c "import server; server.init_db()"`.
-- [ ] 10. Security checks, tests and the full dry run — **Partial**
-       Done: security assertions live inside the 3 Python suites (admin gating, CSRF, token compare_digest,
-       PII stripping, CSP headers, traversal probes) and all pass; `tests/broadcast-flow.spec.js` written
-       and green (register → approve → group → match → desk score → publish → /live, /results, overlay +
-       token gate, PII assertions at the HTTP level).
-       Next: (a) run the manual full dry run on a temp seeded DB; (b) final screenshots at 1440/768/390 px;
-       (c) final report (folder tree, route map, OBS steps, undo-merge command).
+- [x] 10. Security checks, tests and the full dry run — **Done**
+       Automated: `tests/broadcast-flow.spec.js` green (register → approve → group → match → desk score →
+       publish → /live, /results, overlay + token gate, PII assertions). Full `npx playwright test`: 8/8.
+       Python suites: 104 + 94 + 94.
+       Visual dry run (temp seeded DB, `scripts/verify-broadcast.js`): /live + /results at 1440/768/390,
+       all 11 overlays at 1920×1080, admin pages at 1440/768 — clean (no console errors, no 4xx).
+       Interactive desk check: "Eliminate squad" on `/admin/control` → `/live` alive counter updates
+       live 4/4 → 3/4 without reload (SSE), auto-placement + event log correct.
+       Bug found & fixed in the dry run: broadcast admin pages used relative asset/link paths, so the
+       pretty URLs `/admin/<page>` served them unstyled with 404 CSS/JS (commit `973e943` — now
+       root-absolute, matching `overlay.html`'s pattern).
 
 ## How to resume stage 10
 
-1. `npx playwright install chromium` (done on this machine), then `npx playwright test tests/broadcast-flow.spec.js`
-   (green: full register→publish dry run; uses `scripts/create_admin.py` for a throwaway admin on the temp DB).
-2. `npx playwright test` — all 8 specs green on this machine (7 pre-existing + the dry run).
-3. Manual dry run on a temp seeded DB (never `data/registrations.db`), screenshots at 1440/768/390.
-4. Final report: folder tree, route map, test results, OBS setup, undo-merge command.
+All stages done. To re-verify from scratch:
+1. `npx playwright install chromium` (done on this machine), then `npx playwright test` — 8/8 specs
+   (7 pre-existing + the dry run). Python: `python tests/test_api.py`, `test_admin.py`, `test_broadcast.py`.
+2. Visual pass on a temp seeded DB (never `data/registrations.db`):
+   `BGMI_DB=<temp> BGMI_ADMIN_USER=... BGMI_ADMIN_PASSWORD=... node scripts/verify-broadcast.js <base>`.
+3. Undo the merge: `git switch cleanup/repo-tidy` (pre-merge state; merge branch is 10+ commits ahead,
+   nothing on the pre-merge branch was rewritten).

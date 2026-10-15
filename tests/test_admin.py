@@ -496,6 +496,46 @@ def main():
     report("same-origin write accepted", st == 200 and d.get("ok"),
            "status=%s body=%s" % (st, d))
 
+    # ---------- keep-alive: rejected writes must not poison the socket ----------
+    print("\n[keep-alive connection hygiene]")
+    import http.client as _hc
+    import urllib.parse as _up
+    _u = _up.urlsplit(T.BASE)
+    _body = json.dumps({"teamIds": ["CSM-BG-NONE"],
+                        "status": "approved"}).encode()
+
+    conn = _hc.HTTPConnection(_u.hostname, _u.port, timeout=10)
+    try:
+        statuses = []
+        for _ in range(3):
+            conn.request("POST", "/api/admin/bulk-status", _body,
+                         {"Content-Type": "application/json"})
+            r = conn.getresponse()
+            statuses.append(r.status)
+            r.read()
+        report("3x rejected write (no session) on one socket stay 401s",
+               statuses == [401, 401, 401], "statuses=%s" % statuses)
+    finally:
+        conn.close()
+
+    conn = _hc.HTTPConnection(_u.hostname, _u.port, timeout=10)
+    try:
+        statuses = []
+        for csrf_hdr in (None, None, T.SESS_CSRF):
+            hdrs = {"Content-Type": "application/json",
+                    "Cookie": T.SESS_COOKIE}
+            if csrf_hdr:
+                hdrs["X-Admin-CSRF"] = csrf_hdr
+            conn.request("POST", "/api/admin/settings",
+                         json.dumps({"slot_limit": 16}).encode(), hdrs)
+            r = conn.getresponse()
+            statuses.append(r.status)
+            r.read()
+        report("bad-CSRF writes then a good write on one socket",
+               statuses == [403, 403, 200], "statuses=%s" % statuses)
+    finally:
+        conn.close()
+
     # ---------- session lifetime: idle timeout + absolute expiry ----------
     print("\n[session security]")
     import hashlib as _hl

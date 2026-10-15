@@ -1135,6 +1135,15 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     _head_only = False
 
+    def handle_one_request(self):
+        # per-request body accounting: a handler instance serves every
+        # request on its keep-alive connection, so without this reset
+        # drain_body() compares against the previous request's length and
+        # leaves rejected writes' bodies in the socket (the next request
+        # line then parses as garbage -> 501).
+        self._body_read = 0
+        super().handle_one_request()
+
     # ---- helpers ----------------------------------------------------------
 
     def send_json(self, obj, status=200, headers=None):

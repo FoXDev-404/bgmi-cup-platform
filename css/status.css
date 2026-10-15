@@ -1,0 +1,303 @@
+/* status.html — Check your status (scoped .st-* so nothing else shifts) */
+
+.st {
+  padding: 110px 0 80px;
+  min-height: 70vh;
+}
+
+.st-eyebrow {
+  font-family: 'Caveat', cursive;
+  font-size: 1.4rem;
+  color: var(--acid);
+  transform: rotate(-2deg);
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+.st-title {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin: 0 0 14px;
+}
+
+.st-sub {
+  max-width: 56ch;
+  color: rgba(237, 230, 211, 0.72);
+  line-height: 1.65;
+  margin: 0 0 34px;
+}
+
+.st-sub b {
+  color: var(--acid);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+}
+
+/* ---- lookup card ---- */
+
+.st-card {
+  max-width: 560px;
+  background: rgba(12, 13, 16, 0.86);
+  border: 1px dashed rgba(182, 255, 62, 0.45);
+  border-radius: 14px;
+  padding: 26px 26px 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.st-field {
+  display: grid;
+  gap: 7px;
+}
+
+.st-field label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(237, 230, 211, 0.65);
+}
+
+.st-input {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  color: var(--cream);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(237, 230, 211, 0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  width: 100%;
+  transition: border-color 0.18s, background 0.18s;
+}
+
+.st-input:focus {
+  outline: none;
+  border-color: var(--acid);
+  background: rgba(182, 255, 62, 0.06);
+}
+
+.st-input::placeholder {
+  color: rgba(237, 230, 211, 0.35);
+}
+
+.st-textarea {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.5;
+}
+
+.st-submit {
+  justify-self: start;
+  cursor: pointer;
+}
+
+.st-submit[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* ---- result card ---- */
+
+.st-result {
+  max-width: 640px;
+  margin-top: 30px;
+  background: rgba(12, 13, 16, 0.9);
+  border: 1px dashed rgba(237, 230, 211, 0.35);
+  border-radius: 14px;
+  padding: 26px;
+}
+
+.st-result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.st-result-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(237, 230, 211, 0.55);
+  margin: 0 0 6px;
+}
+
+.st-result-id b {
+  color: var(--acid);
+}
+
+.st-result-team {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(1.5rem, 3.6vw, 2.2rem);
+  text-transform: uppercase;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.st-result-tag {
+  color: var(--coral);
+}
+
+/* status badge — colour AND text label (never colour alone) */
+
+.st-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  white-space: nowrap;
+}
+
+.st-badge--pending {
+  color: #f2c14e;
+  background: rgba(242, 193, 78, 0.1);
+}
+
+.st-badge--approved {
+  color: var(--acid);
+  background: rgba(182, 255, 62, 0.1);
+}
+
+.st-badge--rejected {
+  color: var(--coral);
+  background: rgba(217, 83, 79, 0.12);
+}
+
+.st-badge--waitlisted {
+  color: var(--cream);
+  background: rgba(237, 230, 211, 0.08);
+}
+
+.st-badge--needs_changes {
+  color: #7fd4ff;
+  background: rgba(127, 212, 255, 0.1);
+}
+
+.st-note {
+  margin: 18px 0 0;
+  padding: 13px 15px;
+  background: rgba(237, 230, 211, 0.05);
+  border-left: 3px solid var(--coral);
+  border-radius: 0 8px 8px 0;
+  line-height: 1.55;
+  color: rgba(237, 230, 211, 0.9);
+  font-size: 0.95rem;
+}
+
+.st-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.st-meta-cell {
+  flex: 1 1 180px;
+  background: rgba(182, 255, 62, 0.06);
+  border: 1px dashed rgba(182, 255, 62, 0.4);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.st-meta-cell b {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(237, 230, 211, 0.6);
+  margin-bottom: 5px;
+}
+
+.st-meta-cell span {
+  font-family: 'Anton', sans-serif;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  color: var(--acid);
+}
+
+/* ---- request-change ---- */
+
+.st-req-toggle {
+  margin-top: 20px;
+  cursor: pointer;
+}
+
+.st-req {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.st-req label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(237, 230, 211, 0.65);
+}
+
+.st-req .btn-outline {
+  justify-self: start;
+  cursor: pointer;
+}
+
+.st-req-ok {
+  margin: 0;
+  color: var(--acid);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.st-hint {
+  margin-top: 26px;
+  max-width: 56ch;
+  font-size: 0.85rem;
+  color: rgba(237, 230, 211, 0.5);
+  line-height: 1.6;
+}
+
+/* operational next steps under the result card */
+.st-next {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px dashed rgba(182, 255, 60, 0.35);
+  background: rgba(182, 255, 60, 0.05);
+  color: rgba(237, 230, 211, 0.85);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 560px) {
+  .st {
+    padding: 96px 0 60px;
+  }
+
+  .st-card,
+  .st-result {
+    padding: 20px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

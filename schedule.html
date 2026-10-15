@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule | BGMI Cup Noida</title>
+  <meta name="description" content="Match schedule for BGMI Cup Noida 2026, published by the organizers.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0d10'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='bold' fill='%23b6ff3e' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/footer.css?v=1">
+  <link rel="stylesheet" href="css/teams.css?v=2">
+  <link rel="stylesheet" href="css/status.css?v=2">
+</head>
+<body>
+
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== NAV ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">BGMI<em>//</em>CUP<b>.26</b></a>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link" href="/rules">Rules</a>
+        <a class="nav-link" href="/schedule">Schedule</a>
+        <a class="nav-link" href="about.html">About</a>
+        <a class="nav-link" href="/status">Check status</a>
+        <a class="btn-outline btn-sm nav-cta nav-link" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+  <div class="nav-overlay hidden" id="navOverlay"></div>
+
+  <!-- ========== SCHEDULE ========== -->
+  <main class="tm" id="top">
+    <div class="container" style="max-width:820px;">
+      <p class="tm-eyebrow">match day</p>
+      <h1 class="tm-title">Schedule</h1>
+      <p class="tm-sub" id="schedLede">Lobby times, rounds and check-in &mdash; published by the organizers.</p>
+
+      <section class="st-result" id="schedCard" role="status" aria-live="polite" style="margin-top:26px;">
+        <p style="margin:0; color:rgba(237,230,211,.7);">Loading schedule&hellip;</p>
+      </section>
+
+      <div class="st-result hidden" id="schedOff" style="margin-top:26px;">
+        <p style="margin:0 0 10px;">The schedule isn&rsquo;t published yet. Registered teams always see their personal match schedule on <a href="/status" style="color:var(--acid);">/status</a> first.</p>
+        <p style="margin:0; font-size:.85rem; color:rgba(237,230,211,.55);">Not registered yet? <a href="bgmi-team-registration.html#register" style="color:var(--acid);">Register your squad</a> &middot; <a href="/rules" style="color:var(--acid);">Read the rules</a></p>
+      </div>
+
+      <div class="st-result hidden" id="schedErr" style="margin-top:26px;">
+        <p style="margin:0;">Couldn&rsquo;t load the schedule right now &mdash; refresh in a moment. Your own match plan is always on <a href="/status" style="color:var(--acid);">/status</a>.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="bgmi-team-registration.html#briefing">The Meta</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#format">Format</a></li>
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#register">Register team</a></li>
+          <li><a class="f-link" href="/status">Check status</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Official BGMI">
+        <h2 class="footer-heading">Official BGMI</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="https://kraftonindiaesports.com" target="_blank" rel="noopener noreferrer">Krafton India Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.battlegroundsmobileindia.com" target="_blank" rel="noopener noreferrer">BGMI Official <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://kraftonindiaesports.com/globalTournaments" target="_blank" rel="noopener noreferrer">BGMI Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.youtube.com/@KRAFTONINDIAESPORTS" target="_blank" rel="noopener noreferrer">Esports on YouTube <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="/rules">Code of conduct / Fair play</a></li>
+          <li><a class="f-link" href="mailto:organizers@bgmicup.example">Contact organizers</a></li>
+        </ul>
+      </nav>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* navbar */
+      var navbar = document.getElementById('navbar');
+      function handleNavScroll() {
+        if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 60);
+      }
+      window.addEventListener('scroll', handleNavScroll, { passive: true });
+      handleNavScroll();
+
+      var navToggle = document.getElementById('navToggle');
+      var navLinks = document.getElementById('navLinks');
+      var navOverlay = document.getElementById('navOverlay');
+      function closeNav() {
+        navToggle.classList.remove('active');
+        navLinks.classList.remove('open');
+        navOverlay.classList.add('hidden');
+      }
+      navToggle.addEventListener('click', function () {
+        if (navLinks.classList.contains('open')) { closeNav(); }
+        else {
+          navToggle.classList.add('active');
+          navLinks.classList.add('open');
+          navOverlay.classList.remove('hidden');
+        }
+      });
+      navOverlay.addEventListener('click', closeNav);
+      navLinks.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeNav); });
+
+      /* schedule feed — gated server-side by the public teams switch.
+         Everything from the server is rendered via textContent (never
+         innerHTML), so a schedule note can never inject markup. */
+      var card = document.getElementById('schedCard');
+      var off = document.getElementById('schedOff');
+      var err = document.getElementById('schedErr');
+
+      function fmtWhen(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d)) return iso;
+        try {
+          return d.toLocaleString(undefined, {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+          });
+        } catch (e) { return d.toISOString(); }
+      }
+
+      fetch('/api/public/schedule').then(function (r) {
+        return r.json().then(function (d) { return { s: r.status, d: d }; });
+      }).then(function (x) {
+        if (x.s === 404) { card.classList.add('hidden'); off.classList.remove('hidden'); return; }
+        if (x.s !== 200 || !x.d.ok) { card.classList.add('hidden'); err.classList.remove('hidden'); return; }
+
+        card.textContent = '';
+        var note = (x.d.schedule || '').trim();
+        var body = document.createElement('p');
+        body.style.whiteSpace = 'pre-wrap';
+        body.style.margin = '0';
+        if (note) {
+          body.textContent = note;
+        } else {
+          body.style.color = 'rgba(237,230,211,.6)';
+          body.textContent = 'The schedule will be posted here. Times and lobbies also appear on /status for registered teams.';
+        }
+        card.appendChild(body);
+
+        var meta = document.createElement('p');
+        meta.style.cssText = 'margin:14px 0 0; font-size:.8rem; letter-spacing:.06em; color:rgba(237,230,211,.5);';
+        var bits = [];
+        if (x.d.timezone) bits.push('Times in ' + x.d.timezone);
+        if (x.d.updatedAt) bits.push('Last updated ' + fmtWhen(x.d.updatedAt));
+        if (bits.length) meta.textContent = bits.join(' · ');
+        card.appendChild(meta);
+      }).catch(function () {
+        card.classList.add('hidden');
+        err.classList.remove('hidden');
+      });
+    })();
+  </script>
+</body>
+</html>

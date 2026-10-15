@@ -1,0 +1,164 @@
+/* ==========================================================================
+   FOOTER — shared site component (home, about, privacy)
+   Theme vars only, no new fonts
+   ========================================================================== */
+
+.footer {
+  position: relative;
+  overflow: hidden;                /* keep the outlined wordmark inside */
+  padding: 0 24px;                 /* sections carry the vertical rhythm */
+}
+
+.footer > * { position: relative; z-index: 1; }   /* content above decoration */
+
+/* faint outlined wordmark — hero-title style, behind everything */
+.footer-wm {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 15vw, 10rem);
+  line-height: 1;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(236, 231, 216, 0.07);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+/* ---- top: 4-column grid (the .footer border-top is the dashed divider) --- */
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr 1fr 1.2fr;
+  gap: 40px 56px;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 46px 0 40px;
+}
+
+.footer-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #ede6d3;                /* cream BGMI */
+  margin: 0 0 8px;
+}
+
+.footer-title span { color: #b6ff3e; }   /* lime CUP */
+
+.footer-date {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #d9534f;                /* coral */
+  margin: 0 0 18px;
+}
+
+.footer-tagline {
+  font-family: var(--font-type);
+  font-size: 0.8rem;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.footer-cta { display: inline-block; padding: 9px 20px; font-size: 0.68rem; }
+
+.footer-heading {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--acid);
+  margin: 2px 0 14px;
+}
+
+.footer-links { list-style: none; margin: 0; padding: 0; }
+
+.f-link {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-type);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--beige);             /* ~9.8:1 on #0c0d10 — WCAG AA+ */
+  padding: 5px 0;
+  transition: color 0.2s;
+}
+
+.f-link::after {                   /* lime underline animates in */
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  width: 100%;
+  height: 1px;
+  background: var(--acid);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.25s ease;
+}
+
+.f-link:hover { color: var(--ink); }
+.f-link:hover::after,
+.f-link:focus-visible::after { transform: scaleX(1); }
+
+.f-link:focus-visible { outline: 2px solid var(--acid); outline-offset: 3px; }
+
+.ext-icon { margin-left: 5px; color: var(--acid); vertical-align: baseline; }
+
+/* ---- bottom bar ---------------------------------------------------------- */
+
+.footer-bottom {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 18px 0 26px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  font-family: var(--font-type);
+  font-size: 0.7rem;
+  color: var(--beige);
+}
+
+.footer-bottom p { margin: 0; }
+
+/* ---- footer heart — "Made with ♥ by FE_PSYCHO" --------------------------- */
+
+.footer-heart {
+  display: inline-block;
+  color: var(--acid);
+  animation: footer-heart-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes footer-heart-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer-heart { animation: none; }
+}
+
+/* ---- responsive ---------------------------------------------------------- */
+
+@media (max-width: 1023px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 34px 44px; padding: 40px 0 34px; }
+}
+
+@media (max-width: 575px) {
+  .footer-grid { grid-template-columns: 1fr; gap: 26px; padding: 34px 0 30px; }
+  .f-link { display: block; padding: 12px 0; }   /* >= 44px touch targets */
+  .footer-bottom { flex-direction: column; text-align: center; padding: 16px 0 24px; }
+  .footer-wm { font-size: clamp(3rem, 24vw, 7rem); }
+}

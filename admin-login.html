@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in | BGMI Cup Control Room</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0d10'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='bold' fill='%23b6ff3e' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css?v=4">
+  <link rel="stylesheet" href="css/footer.css?v=1">
+</head>
+<body>
+
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== LOGIN GATE ========== -->
+  <section class="adm-gate">
+    <div class="adm-gate-card">
+      <div class="adm-eyebrow">restricted area</div>
+      <h1 class="adm-title">Control room</h1>
+      <p class="adm-lede">Registrations, approvals and groups live behind this door.</p>
+      <form id="loginForm" autocomplete="on">
+        <label class="adm-field-label" for="loginUser">Username</label>
+        <input type="text" id="loginUser" class="adm-token-input"
+               placeholder="admin username" autocomplete="username" required>
+        <label class="adm-field-label" for="loginPass">Password</label>
+        <input type="password" id="loginPass" class="adm-token-input"
+               placeholder="password" autocomplete="current-password" required>
+        <button type="submit" class="btn-primary adm-unlock" id="loginBtn">Sign in</button>
+      </form>
+      <span class="form-error" id="loginError" role="alert"></span>
+      <div class="adm-gate-foot">
+        <a href="/bgmi-team-registration.html">&larr; back to registration</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="bgmi-team-registration.html#briefing">The Meta</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#format">Format</a></li>
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#register">Register team</a></li>
+          <li><a class="f-link" href="/status">Check status</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Official BGMI">
+        <h2 class="footer-heading">Official BGMI</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="https://kraftonindiaesports.com" target="_blank" rel="noopener noreferrer">Krafton India Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.battlegroundsmobileindia.com" target="_blank" rel="noopener noreferrer">BGMI Official <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://kraftonindiaesports.com/globalTournaments" target="_blank" rel="noopener noreferrer">BGMI Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.youtube.com/@KRAFTONINDIAESPORTS" target="_blank" rel="noopener noreferrer">Esports on YouTube <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="/rules">Code of conduct / Fair play</a></li>
+          <li><a class="f-link" href="mailto:organizers@bgmicup.example">Contact organizers</a></li>
+        </ul>
+      </nav>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+      var form = document.getElementById('loginForm');
+      var err = document.getElementById('loginError');
+      var btn = document.getElementById('loginBtn');
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        err.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Signing in…';
+        fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('loginUser').value.trim(),
+            password: document.getElementById('loginPass').value
+          })
+        })
+          .then(function (r) {
+            return r.json().then(function (d) { return { s: r.status, d: d }; });
+          })
+          .then(function (x) {
+            if (x.s === 200 && x.d.ok) {
+              location.href = '/admin';
+            } else {
+              err.textContent = x.d.error || 'Sign-in failed.';
+              btn.disabled = false;
+              btn.textContent = 'Sign in';
+            }
+          })
+          .catch(function () {
+            err.textContent = 'Network hiccup — try again.';
+            btn.disabled = false;
+            btn.textContent = 'Sign in';
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Note — BGMI Cup Noida 2026</title>
+  <meta name="description" content="What the BGMI Cup Noida 2026 registration stores, why we store it, and when it gets purged.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0d10'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='bold' fill='%23b6ff3e' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/bgmi-register.css?v=4">
+  <link rel="stylesheet" href="css/footer.css?v=1">
+
+  <style>
+    /* privacy prose — page-scoped, same tokens as the theme */
+    .pp-body { max-width: 760px; margin: 0 auto; }
+    .pp-body h3 {
+      font-family: 'JetBrains Mono', monospace; font-size: .82rem; font-weight: 700;
+      letter-spacing: .2em; text-transform: uppercase; color: var(--acid);
+      margin: 2.4rem 0 .7rem;
+    }
+    .pp-body h3:first-child { margin-top: 0; }
+    .pp-body p, .pp-body li {
+      font-family: 'Special Elite', monospace; font-size: .98rem; line-height: 1.75;
+      color: var(--ink);
+    }
+    .pp-body ul { list-style: none; margin: .4rem 0 .8rem; padding: 0; }
+    .pp-body li { padding-left: 1.4rem; position: relative; margin-bottom: .35rem; }
+    .pp-body li::before { content: '\00bb'; position: absolute; left: 0; color: var(--red); }
+    .pp-body code {
+      font-family: 'JetBrains Mono', monospace; font-size: .85em;
+      background: var(--acid-dim); color: var(--ink); padding: .1em .4em;
+      border: 1px solid var(--ink);
+    }
+    .pp-card {
+      background: var(--paper); border: 2px solid var(--ink);
+      box-shadow: 6px 6px 0 var(--ink); padding: 1.6rem 1.8rem; margin: 1.6rem 0;
+    }
+    .pp-card--alert { border-color: var(--red); box-shadow: 6px 6px 0 var(--red); }
+    /* dark text on paper — theme convention for light surfaces */
+    .pp-card h3, .pp-card p, .pp-card li { color: #0c0d10; }
+    .pp-card h3::before {
+      content: ''; display: inline-block; width: .72em; height: .72em;
+      background: var(--acid); border: 1px solid #0c0d10;
+      margin-right: .55em; vertical-align: baseline;
+    }
+    .pp-card h3:first-child::before { margin-left: 0; }
+    .pp-card code {
+      font-family: 'JetBrains Mono', monospace; font-size: .85em;
+      background: var(--acid-dim); color: #0c0d10; padding: .1em .4em;
+      border: 1px solid #0c0d10;
+    }
+    .pp-card b { color: #0c0d10; }
+    .pp-meta {
+      font-family: 'JetBrains Mono', monospace; font-size: .72rem;
+      letter-spacing: .16em; text-transform: uppercase; color: var(--ink);
+      opacity: .65; margin-top: 2.6rem;
+    }
+    .pp-back { display: inline-block; margin-top: 1.4rem; }
+  </style>
+</head>
+<body>
+
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== NAV ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="bgmi-team-registration.html#top">BGMI<em>//</em>CUP<b>.26</b></a>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link" href="bgmi-team-registration.html#briefing">The Meta</a>
+        <a class="nav-link" href="bgmi-team-registration.html#format">Format</a>
+        <a class="nav-link" href="/rules">Rules</a>
+        <a class="nav-link" href="/rules">Rules</a>
+        <a class="nav-link" href="/schedule">Schedule</a>
+        <a class="nav-link" href="about.html">About</a>
+        <a class="nav-link" href="/status">Check status</a>
+        <a class="btn-outline btn-sm nav-cta nav-link" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+  <div class="nav-overlay hidden" id="navOverlay"></div>
+
+  <!-- ========== CONTENT ========== -->
+  <section class="section sec-a" id="top" style="padding-top:140px;">
+    <div class="container">
+      <div class="section-header fade-in-up visible">
+        <span class="section-label">Privacy Note</span>
+        <h2 class="section-title">What we take.<br><span class="crack">What we don't.</span></h2>
+        <p class="section-desc">Short version: we store your team sheet to run the bracket, never sell it, and purge it after the event.</p>
+      </div>
+
+      <div class="pp-body fade-in-up visible" style="--delay:.1s">
+        <div class="pp-card">
+          <h3>What the form collects</h3>
+          <ul>
+            <li>Team name, team tag, in-game guild name</li>
+            <li>Captain IGN, BGMI Character ID (UID), email, phone, Discord handle (optional)</li>
+            <li>Each roster player's IGN and Character ID (4 starters, up to 2 substitutes)</li>
+            <li>Optional team logo image (PNG / JPG / WEBP, max 2 MB)</li>
+          </ul>
+
+          <h3>What happens automatically</h3>
+          <ul>
+            <li>Your IP address is held briefly for spam and rate-limit checks</li>
+            <li>A hidden honeypot field filters out form-filling bots</li>
+            <li>Requests carry a short-lived CSRF token — it dies after one use and is never stored with your squad</li>
+          </ul>
+        </div>
+
+        <h3>Why we store it</h3>
+        <p>Only to seed the bracket, verify one-account-per-player, contact team captains about match times, and print the squad sheet on event day. That's it.</p>
+
+        <h3>Who can see it</h3>
+        <p>Tournament organizers only. The registration list sits behind an admin token — it is never exposed on any public page of this site.</p>
+
+        <h3>What we never do</h3>
+        <ul>
+          <li>No selling, renting, or sharing your details with third parties</li>
+          <li>No marketing lists, no spam, no "partner offers"</li>
+          <li>No BGMI/Krafton affiliation — this data never leaves the tournament</li>
+        </ul>
+
+        <h3>Retention</h3>
+        <p>Team sheets are purged automatically after the event's prize distribution closes. Logos are deleted with the squad they belong to. You can request early deletion any time before the event — just ask an organizer and we'll drop your row and cascade the roster.</p>
+
+        <div class="pp-card pp-card--alert">
+          <h3 style="margin-top:0;">Fair play &amp; data</h3>
+          <p style="margin-bottom:0;">Character IDs are public-by-design identifiers inside BGMI — we use them to enforce <b>one account per player</b>. If a UID is already registered to another squad, both registrations are reviewed by organizers rather than silently overwritten.</p>
+        </div>
+
+        <a class="btn-outline pp-back" href="bgmi-team-registration.html#register">&larr; Back to registration</a>
+
+        <p class="pp-meta">BGMI//CUP.26 &mdash; EDITION 3 &mdash; GALGOTIAS POLYTECHNIC, GREATER NOIDA</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="bgmi-team-registration.html#briefing">The Meta</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#format">Format</a></li>
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#register">Register team</a></li>
+          <li><a class="f-link" href="/status">Check status</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Official BGMI">
+        <h2 class="footer-heading">Official BGMI</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="https://kraftonindiaesports.com" target="_blank" rel="noopener noreferrer">Krafton India Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.battlegroundsmobileindia.com" target="_blank" rel="noopener noreferrer">BGMI Official <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://kraftonindiaesports.com/globalTournaments" target="_blank" rel="noopener noreferrer">BGMI Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.youtube.com/@KRAFTONINDIAESPORTS" target="_blank" rel="noopener noreferrer">Esports on YouTube <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="/rules">Code of conduct / Fair play</a></li>
+          <li><a class="f-link" href="mailto:organizers@bgmicup.example">Contact organizers</a></li>
+        </ul>
+      </nav>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script src="/js/bgmi-register.js?v=6"></script>
+</body>
+</html>

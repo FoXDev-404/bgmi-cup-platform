@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Room — BGMI Cup Noida 2026 Admin</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0d10'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='bold' fill='%23b6ff3e' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css?v=5">
+  <link rel="stylesheet" href="css/status.css?v=1">
+  <link rel="stylesheet" href="css/footer.css?v=1">
+</head>
+<body>
+
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== NAV ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">BGMI<em>//</em>CUP<b>.26</b></a>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link" href="/status">Check status</a>
+        <a class="nav-link" href="bgmi-team-registration.html">Registration site</a>
+        <a class="btn-outline btn-sm nav-cta nav-link" id="logoutNavBtn" href="#">Log out</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+  <div class="nav-overlay hidden" id="navOverlay"></div>
+
+  <!-- ========== PANEL ========== -->
+  <main class="pan" id="top">
+    <header class="adm-head">
+      <div>
+        <div class="adm-eyebrow">live data &mdash; updated <span id="updatedAt">just now</span></div>
+        <h1 class="adm-title">Control room</h1>
+        <p class="adm-user">signed in as <b id="whoAmI">&hellip;</b></p>
+      </div>
+      <div class="adm-actions">
+        <button type="button" class="adm-btn" id="refreshBtn">&#8635; Refresh</button>
+        <a class="adm-btn" href="/api/admin/export/approved.csv" id="expApproved">&#8681; Approved CSV</a>
+        <a class="adm-btn" href="/api/admin/export/groups.csv" id="expGroups">&#8681; Groups CSV</a>
+        <button type="button" class="adm-btn adm-btn--ghost" id="logoutBtn">Log out</button>
+      </div>
+    </header>
+
+    <!-- dashboard stats -->
+    <div class="adm-stats" id="statsRow">
+      <div class="adm-stat"><span class="adm-stat-n" id="statTotal">0</span><span class="adm-stat-l">registrations</span></div>
+      <div class="adm-stat"><span class="adm-stat-n" id="statPending">0</span><span class="adm-stat-l">pending</span></div>
+      <div class="adm-stat adm-stat--acid"><span class="adm-stat-n" id="statApproved">0</span><span class="adm-stat-l" id="slotLine">approved / 16 slots</span></div>
+      <div class="adm-stat"><span class="adm-stat-n" id="statRejected">0</span><span class="adm-stat-l">rejected</span></div>
+      <div class="adm-stat"><span class="adm-stat-n" id="statWaitlisted">0</span><span class="adm-stat-l">waitlisted</span></div>
+      <div class="adm-stat"><span class="adm-stat-n" id="statNeeds">0</span><span class="adm-stat-l">needs changes</span></div>
+      <div class="adm-stat"><span class="adm-stat-n" id="statGroups">0</span><span class="adm-stat-l">groups filled</span></div>
+    </div>
+
+    <!-- notification queue health — only shown when something needs eyes -->
+    <div class="adm-notice adm-notice--warn hidden" id="notifyBanner" role="status">
+      <span id="notifyText"></span>
+      <button type="button" class="adm-btn" id="notifyRetry" hidden>Retry queue</button>
+    </div>
+
+    <!-- tabs -->
+    <nav class="adm-tabs" role="tablist" aria-label="Panel sections">
+      <button class="adm-tab" id="tabBtnQueue" role="tab" aria-selected="true" aria-controls="tabQueue">Queue</button>
+      <button class="adm-tab" id="tabBtnGroups" role="tab" aria-selected="false" aria-controls="tabGroups">Groups</button>
+      <button class="adm-tab" id="tabBtnAudit" role="tab" aria-selected="false" aria-controls="tabAudit">Audit log</button>
+      <button class="adm-tab" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tabSettings">Settings</button>
+    </nav>
+
+    <div class="form-error hidden" id="loadError" role="alert"></div>
+
+    <!-- ================= QUEUE ================= -->
+    <section id="tabQueue" role="tabpanel" aria-labelledby="tabBtnQueue">
+
+      <div class="adm-chips" id="statusChips" aria-label="Filter by status">
+        <button class="adm-chip adm-chip--active" data-status="all" aria-pressed="true">All <b id="chipAll">0</b></button>
+        <button class="adm-chip adm-chip--pending" data-status="pending" aria-pressed="false">Pending <b id="chipPending">0</b></button>
+        <button class="adm-chip adm-chip--approved" data-status="approved" aria-pressed="false">Approved <b id="chipApproved">0</b></button>
+        <button class="adm-chip adm-chip--rejected" data-status="rejected" aria-pressed="false">Rejected <b id="chipRejected">0</b></button>
+        <button class="adm-chip adm-chip--waitlisted" data-status="waitlisted" aria-pressed="false">Waitlisted <b id="chipWaitlisted">0</b></button>
+        <button class="adm-chip adm-chip--needs" data-status="needs_changes" aria-pressed="false">Needs changes <b id="chipNeeds">0</b></button>
+      </div>
+
+      <div class="adm-toolbar">
+        <input type="search" id="searchInput" class="adm-search"
+               placeholder="search tag, squad, guild, IGN, UID, email&hellip;" aria-label="Search registrations">
+        <label class="adm-sort" for="sortSelect">Sort
+          <select id="sortSelect">
+            <option value="date">Newest first</option>
+            <option value="name">Team A-Z</option>
+            <option value="status">By status</option>
+          </select>
+        </label>
+        <div class="adm-bulk" id="bulkBar">
+          <span id="selCount">0 selected</span>
+          <button class="adm-btn adm-btn--go" id="bulkApprove" disabled>&#10003; Approve</button>
+          <button class="adm-btn adm-btn--no" id="bulkReject" disabled>&#10007; Reject</button>
+        </div>
+      </div>
+
+      <div class="adm-table-wrap">
+        <table class="adm-table" id="queueTable">
+          <thead>
+            <tr>
+              <th scope="col" class="adm-th-check">
+                <input type="checkbox" id="selAll" aria-label="Select all rows">
+              </th>
+              <th scope="col">Team</th>
+              <th scope="col">Captain</th>
+              <th scope="col">Status</th>
+              <th scope="col">Group</th>
+              <th scope="col">Registered</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="queueBody"></tbody>
+        </table>
+      </div>
+      <div class="adm-empty hidden" id="emptyState">No registrations match this filter.</div>
+    </section>
+
+    <!-- ================= TEAM DETAIL ================= -->
+    <section id="tabDetail" class="hidden" role="tabpanel" aria-labelledby="tabBtnQueue">
+      <button type="button" class="adm-btn adm-btn--ghost" id="backBtn">&larr; Back to queue</button>
+      <div id="detailBody"></div>
+    </section>
+
+    <!-- ================= GROUPS ================= -->
+    <section id="tabGroups" class="hidden" role="tabpanel" aria-labelledby="tabBtnGroups">
+      <div class="adm-toolbar">
+        <span class="adm-slots" id="groupSlots">Approved 0 / 16</span>
+        <label class="adm-sort" for="lockGlobal">
+          <input type="checkbox" id="lockGlobal"> Lock all groups
+        </label>
+        <button class="adm-btn" id="autoBtn">&#9881; Auto-distribute (random)</button>
+        <button class="adm-btn" id="printBtn">&#128424; Print sheet</button>
+      </div>
+
+      <form class="adm-inline-form" id="createForm">
+        <label for="newGroupName">New group</label>
+        <input class="adm-mini" id="newGroupName" placeholder="Group D" maxlength="20" required>
+        <label for="newGroupSize">size</label>
+        <input class="adm-mini" id="newGroupSize" type="number" min="1" max="32" value="4" required>
+        <button class="adm-btn adm-btn--go" type="submit">Create</button>
+      </form>
+
+      <div class="adm-notice hidden" id="autoNotice" role="status"></div>
+
+      <div class="adm-groups" id="groupsGrid"></div>
+
+      <div class="adm-unassigned">
+        <h2 class="adm-h2">Approved, unassigned <span id="unassignedCount">(0)</span></h2>
+        <div id="unassignedList" class="adm-unassigned-list"></div>
+      </div>
+    </section>
+
+    <!-- ================= AUDIT ================= -->
+    <section id="tabAudit" class="hidden" role="tabpanel" aria-labelledby="tabBtnAudit">
+      <div class="adm-table-wrap">
+        <table class="adm-table adm-table--audit">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Who</th>
+              <th scope="col">Team</th>
+              <th scope="col">Action</th>
+              <th scope="col">Change</th>
+            </tr>
+          </thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+      </div>
+      <div class="adm-empty hidden" id="auditEmpty">Nothing logged yet.</div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section id="tabSettings" class="hidden" role="tabpanel" aria-labelledby="tabBtnSettings">
+      <div class="adm-settings">
+        <div class="adm-set-card">
+          <h2 class="adm-h2">Slot limit</h2>
+          <p class="adm-p">Approvals stop at this many teams unless you tick <b>override</b> on the confirm step.</p>
+          <form class="adm-inline-form" id="slotForm">
+            <label for="slotInput">Approved max</label>
+            <input class="adm-mini" id="slotInput" type="number" min="1" max="256" value="16">
+            <button class="adm-btn adm-btn--go" type="submit">Save</button>
+          </form>
+        </div>
+
+        <div class="adm-set-card">
+          <h2 class="adm-h2">Public teams list</h2>
+          <p class="adm-p">When on, anyone can see approved team names, tags and logos at <a href="/teams">/teams</a>. Nothing else is ever public.</p>
+          <label class="adm-sort"><input type="checkbox" id="pubTeams"> Publish approved teams</label>
+        </div>
+
+        <div class="adm-set-card">
+          <h2 class="adm-h2">Public schedule <span class="adm-dim">(/schedule)</span></h2>
+          <p class="adm-p">Shown at <a href="/schedule">/schedule</a> once the public teams list is on. Plain text &mdash; line breaks are kept.</p>
+          <form id="schedForm" class="adm-sched-form">
+            <label for="schedTimezone">Timezone label</label>
+            <input class="adm-mini" id="schedTimezone" placeholder="Asia/Kolkata" maxlength="40">
+            <label for="schedNote">Schedule</label>
+            <textarea id="schedNote" rows="5" maxlength="2000"
+              placeholder="e.g. 14 Nov — 10:00 check-in · 11:00 lobby · 12:00 Round 1 (ERANGEL)…"></textarea>
+            <button class="adm-btn adm-btn--go" type="submit">Save schedule</button>
+          </form>
+          <p class="adm-p adm-dim" id="schedUpdated"></p>
+        </div>
+
+        <div class="adm-set-card">
+          <h2 class="adm-h2">E-mail notifications</h2>
+          <p class="adm-p" id="smtpLine">Checking SMTP configuration&hellip;</p>
+        </div>
+
+        <div class="adm-set-card adm-set-card--danger">
+          <h2 class="adm-h2">Danger zone</h2>
+          <p class="adm-p">Purges every team, roster, logo, group and request. Audit log survives without personal data. Type the confirmation to run it.</p>
+          <button class="adm-btn adm-btn--no" id="purgeBtn">Purge all team data</button>
+          <form class="adm-inline-form hidden" id="purgeForm">
+            <label for="purgeInput">Type <b>PURGE</b> to confirm</label>
+            <input class="adm-mini" id="purgeInput" autocomplete="off" placeholder="PURGE">
+            <button class="adm-btn adm-btn--no" type="submit">Erase everything</button>
+            <button class="adm-btn adm-btn--ghost" type="button" id="purgeCancel">Cancel</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="bgmi-team-registration.html#briefing">The Meta</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#format">Format</a></li>
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#register">Register team</a></li>
+          <li><a class="f-link" href="/status">Check status</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Official BGMI">
+        <h2 class="footer-heading">Official BGMI</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="https://kraftonindiaesports.com" target="_blank" rel="noopener noreferrer">Krafton India Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.battlegroundsmobileindia.com" target="_blank" rel="noopener noreferrer">BGMI Official <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://kraftonindiaesports.com/globalTournaments" target="_blank" rel="noopener noreferrer">BGMI Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.youtube.com/@KRAFTONINDIAESPORTS" target="_blank" rel="noopener noreferrer">Esports on YouTube <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="/rules">Code of conduct / Fair play</a></li>
+          <li><a class="f-link" href="mailto:organizers@bgmicup.example">Contact organizers</a></li>
+        </ul>
+      </nav>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script src="js/panel.js?v=2"></script>
+</body>
+</html>

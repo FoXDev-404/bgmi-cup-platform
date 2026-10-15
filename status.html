@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Status | BGMI Cup Noida</title>
+  <meta name="robots" content="noindex">
+  <meta name="description" content="Check your BGMI Cup Noida 2026 registration status with your Reg ID.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c0d10'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='bold' fill='%23b6ff3e' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/footer.css?v=1">
+  <link rel="stylesheet" href="css/status.css?v=2">
+</head>
+<body>
+
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== NAV ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">BGMI<em>//</em>CUP<b>.26</b></a>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link" href="bgmi-team-registration.html#briefing">The Meta</a>
+        <a class="nav-link" href="bgmi-team-registration.html#format">Format</a>
+        <a class="nav-link" href="/rules">Rules</a>
+        <a class="nav-link" href="/schedule">Schedule</a>
+        <a class="nav-link" href="about.html">About</a>
+        <a class="nav-link nav-link--active" href="/status" aria-current="page">Check status</a>
+        <a class="btn-outline btn-sm nav-cta nav-link" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+  <div class="nav-overlay hidden" id="navOverlay"></div>
+
+  <!-- ========== STATUS ========== -->
+  <main class="st" id="top">
+    <div class="container">
+
+      <p class="st-eyebrow">drop check</p>
+      <h1 class="st-title">Check your status</h1>
+      <p class="st-sub">Grab the Reg ID from your confirmation (like <b>BGMI26-0042</b>) and the captain's phone or email. Only you can see your details.</p>
+
+      <form class="st-card" id="lookupForm" autocomplete="off" novalidate>
+        <div class="st-field">
+          <label for="regCode">Registration ID</label>
+          <input class="st-input" type="text" id="regCode" name="regCode"
+                 placeholder="BGMI26-0042" spellcheck="false" required
+                 aria-describedby="lookupError">
+        </div>
+        <div class="st-field">
+          <label for="hint">Captain phone or email</label>
+          <input class="st-input" type="text" id="hint" name="hint"
+                 placeholder="98xxxxxxxx or cap@example.com" required
+                 aria-describedby="lookupError">
+        </div>
+        <button class="btn-primary st-submit" type="submit" id="lookupBtn">Check status</button>
+        <p class="form-error" id="lookupError" role="alert"></p>
+      </form>
+
+      <!-- result -->
+      <section class="st-result hidden" id="result" aria-live="polite">
+        <div class="st-result-head">
+          <div>
+            <p class="st-result-id">REG ID <b id="resCode">BGMI26-0000</b></p>
+            <h2 class="st-result-team"><span id="resTeam">Team</span> <span class="st-result-tag" id="resTag">[TAG]</span></h2>
+          </div>
+          <span class="st-badge" id="resBadge">Status</span>
+        </div>
+
+        <p class="st-note hidden" id="resNote"></p>
+
+        <div class="st-meta" id="resMeta">
+          <div class="st-meta-cell hidden" id="resGroupCell">
+            <b>Group</b><span id="resGroup">—</span>
+          </div>
+          <div class="st-meta-cell hidden" id="resScheduleCell">
+            <b>Match schedule</b><span id="resSchedule">—</span>
+          </div>
+          <div class="st-meta-cell">
+            <b>Last updated</b><span id="resUpdated">—</span>
+          </div>
+        </div>
+
+        <p class="st-next" id="resNext" role="status"></p>
+
+        <button class="btn-ghost st-req-toggle" id="reqToggle" type="button">Request a correction</button>
+
+        <form class="st-req hidden" id="reqForm" autocomplete="off" novalidate>
+          <label for="reqMessage">What needs fixing? (IGN typo, UID, contact&hellip;)</label>
+          <textarea class="st-input st-textarea" id="reqMessage" rows="4"
+                    maxlength="1000" required aria-describedby="reqError"></textarea>
+          <button class="btn-outline" type="submit" id="reqBtn">Send request</button>
+          <p class="form-error" id="reqError" role="alert"></p>
+          <p class="st-req-ok hidden" id="reqOk" role="status">Request sent. The admins see it in the queue &mdash; changes show here once reviewed.</p>
+        </form>
+      </section>
+
+      <p class="st-hint">Lost your Reg ID? Check the confirmation screen or the squad pass PDF. Status updates instantly after a decision &mdash; refresh any time.</p>
+    </div>
+  </main>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="bgmi-team-registration.html#briefing">The Meta</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#format">Format</a></li>
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+          <li><a class="f-link" href="bgmi-team-registration.html#register">Register team</a></li>
+          <li><a class="f-link" href="/status">Check status</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Official BGMI">
+        <h2 class="footer-heading">Official BGMI</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="https://kraftonindiaesports.com" target="_blank" rel="noopener noreferrer">Krafton India Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.battlegroundsmobileindia.com" target="_blank" rel="noopener noreferrer">BGMI Official <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://kraftonindiaesports.com/globalTournaments" target="_blank" rel="noopener noreferrer">BGMI Esports <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+          <li><a class="f-link" href="https://www.youtube.com/@KRAFTONINDIAESPORTS" target="_blank" rel="noopener noreferrer">Esports on YouTube <svg class="ext-icon" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path d="M4 2h6v6M10 2 3.5 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="/rules">Code of conduct / Fair play</a></li>
+          <li><a class="f-link" href="mailto:organizers@bgmicup.example">Contact organizers</a></li>
+        </ul>
+      </nav>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script>
+    /* navbar: scrolled backdrop + mobile drawer (same behaviour as other pages) */
+    (function () {
+      'use strict';
+      var navbar = document.getElementById('navbar');
+      function handleNavScroll() {
+        if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 60);
+      }
+      window.addEventListener('scroll', handleNavScroll, { passive: true });
+      handleNavScroll();
+
+      var navToggle = document.getElementById('navToggle');
+      var navLinks = document.getElementById('navLinks');
+      var navOverlay = document.getElementById('navOverlay');
+      function closeNav() {
+        navToggle.classList.remove('active');
+        navLinks.classList.remove('open');
+        navOverlay.classList.add('hidden');
+      }
+      navToggle.addEventListener('click', function () {
+        if (navLinks.classList.contains('open')) { closeNav(); }
+        else {
+          navToggle.classList.add('active');
+          navLinks.classList.add('open');
+          navOverlay.classList.remove('hidden');
+        }
+      });
+      navOverlay.addEventListener('click', closeNav);
+      navLinks.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeNav); });
+    })();
+  </script>
+  <script src="/js/status.js?v=2"></script>
+</body>
+</html>

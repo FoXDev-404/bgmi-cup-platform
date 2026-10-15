@@ -3,72 +3,124 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Results · BGMI Champions Cup</title>
-<meta name="description" content="Standings, group tables and match results of the BGMI Champions Cup.">
+<title>Results | BGMI Cup Noida</title>
+<meta name="description" content="Standings, group tables and match results of the BGMI Cup Noida 2026 tournament.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Special+Elite&family=Caveat:wght@600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/footer.css?v=1">
+<link rel="stylesheet" href="css/control.css?v=1">
 </head>
 <body>
-<header class="top">
-  <div class="container nav">
-    <a class="brand" href="/">BGMI <span>CUP</span></a>
-    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
-    <nav class="nav-links">
-      <a href="/">Home</a>
-      <a href="/teams">Teams</a>
-      <a href="/schedule">Schedule</a>
-      <a href="/live">Live</a>
-      <a class="active" href="/results">Results</a>
-      <a href="/status">Status</a>
-      <a href="/about">About</a>
-    </nav>
-  </div>
-</header>
 
-<main class="section">
-  <div class="container">
-    <div class="admlive">
-      <div class="stamp" style="color:var(--acid)">Published results</div>
-      <h1>RESULTS <span class="thin">& STANDINGS</span></h1>
-      <p class="muted">Only published matches count. Points = placement points + kills.</p>
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- ========== NAV ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="/">BGMI<em>//</em>CUP<b>.26</b></a>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link" href="/rules">Rules</a>
+        <a class="nav-link" href="/schedule">Schedule</a>
+        <a class="nav-link" href="/live">Live</a>
+        <a class="nav-link" href="/results">Results</a>
+        <a class="nav-link" href="about.html">About</a>
+        <a class="nav-link" href="/status">Check status</a>
+        <a class="btn-outline btn-sm nav-cta nav-link" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
+  </nav>
+  <div class="nav-overlay hidden" id="navOverlay"></div>
 
-    <section class="admcard" style="margin-bottom:18px">
-      <h3>Overall standings</h3>
-      <div style="overflow-x:auto"><table class="tbl">
-        <thead><tr><th>#</th><th>Team</th><th>Group</th><th>P</th><th>W</th><th>K</th><th>Pos</th><th>Total</th></tr></thead>
-        <tbody id="standings"></tbody>
-      </table></div>
-      <p id="empty" class="muted" hidden>No results yet.</p>
-    </section>
+  <!-- ========== RESULTS ========== -->
+  <main class="section">
+    <div class="container">
 
-    <div id="groups" class="admgrid"></div>
+      <header class="bc-head">
+        <div>
+          <div class="bc-eyebrow">published &mdash; standings</div>
+          <h1 class="bc-title">Results</h1>
+          <p class="bc-p">Only published matches count. Points = placement
+            points + kills. Tie-breakers: points &rarr; wins &rarr; placement
+            points &rarr; kills &rarr; last-match placement.</p>
+        </div>
+        <div class="bc-actions">
+          <a class="bc-btn" href="/live">Live centre &rarr;</a>
+        </div>
+      </header>
 
-    <section class="admcard" style="margin-top:18px">
-      <h3>Match results</h3>
-      <div id="matches" class="admgrid"></div>
-    </section>
+      <section class="bc-card">
+        <h2 class="bc-h2">Overall standings</h2>
+        <div style="overflow-x:auto">
+          <table class="bc-table">
+            <thead><tr><th>#</th><th>Team</th><th>Group</th><th>P</th><th>W</th><th>K</th><th>Pos</th><th>Total</th></tr></thead>
+            <tbody id="standings"></tbody>
+          </table>
+        </div>
+        <p id="empty" class="bc-p bc-dim" hidden>No results yet.</p>
+      </section>
 
-    <section class="admcard" style="margin-top:18px">
-      <h3>Top fraggers</h3>
-      <div style="overflow-x:auto"><table class="tbl">
-        <thead><tr><th>#</th><th>Player</th><th>Team</th><th>Kills</th><th>Damage</th></tr></thead>
-        <tbody id="fraggers"></tbody>
-      </table></div>
-    </section>
-  </div>
-</main>
+      <div id="groups" class="bc-grid" style="margin-top:16px"></div>
 
-<footer class="footer">
-  <div class="container fcols">
-    <div><h4>Event</h4><p>BGMI Champions Cup</p><p><a href="/schedule">Schedule</a></p><p><a href="/teams">Teams</a></p></div>
-    <div><h4>Watch</h4><p><a href="/live">Live</a></p><p><a href="/results">Results</a></p><p><a href="/about">About</a></p></div>
-    <div><h4>Legal</h4><p><a href="/privacy.html">Privacy</a></p></div>
-  </div>
-</footer>
-<script src="/js/nav.js"></script>
-<script src="/js/results.js"></script>
+      <section class="bc-card" style="margin-top:16px">
+        <h2 class="bc-h2">Match results</h2>
+        <div id="matches" class="bc-grid"></div>
+        <p id="noMatches" class="bc-p bc-dim" hidden>No match results published yet.</p>
+      </section>
+
+      <section class="bc-card" style="margin-top:16px">
+        <h2 class="bc-h2">Top fraggers</h2>
+        <div style="overflow-x:auto">
+          <table class="bc-table">
+            <thead><tr><th>#</th><th>Player</th><th>Team</th><th>Kills</th><th>Damage</th></tr></thead>
+            <tbody id="fraggers"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="footer" style="position:relative;">
+    <span class="footer-wm" aria-hidden="true">BGMI CUP</span>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <p class="footer-title">BGMI <span>CUP</span></p>
+        <p class="footer-date">Noida // 14 Nov 2026</p>
+        <p class="footer-tagline">Four seats. One drop. Zero rage quits.</p>
+        <a class="btn-primary footer-cta" href="bgmi-team-registration.html#register">Register team</a>
+      </div>
+      <nav class="footer-col" aria-label="Tournament">
+        <h2 class="footer-heading">Tournament</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="/rules">Rules</a></li>
+          <li><a class="f-link" href="/schedule">Schedule</a></li>
+          <li><a class="f-link" href="/live">Live standings</a></li>
+          <li><a class="f-link" href="/results">Results</a></li>
+          <li><a class="f-link" href="about.html">About</a></li>
+          <li><a class="f-link" href="/status">Check status</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-links">
+          <li><a class="f-link" href="privacy.html">Privacy note</a></li>
+          <li><a class="f-link" href="mailto:organizers@bgmicup.example">Contact organizers</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 BGMI Cup Noida. Independent community event, not affiliated with KRAFTON.</p>
+      <p>Made with <span class="footer-heart" role="img" aria-label="love">&#9829;</span> by FE_PSYCHO</p>
+    </div>
+  </footer>
+
+  <script src="js/nav.js?v=1"></script>
+  <script src="js/results.js?v=1"></script>
 </body>
 </html>

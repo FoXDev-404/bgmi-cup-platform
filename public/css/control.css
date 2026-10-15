@@ -322,6 +322,39 @@
 .bc-statcard-team { font-family: var(--font-mono); font-size: .64rem; color: var(--acid); letter-spacing: .1em; }
 .bc-statcard-stats { font-family: var(--font-mono); font-size: .76rem; color: var(--beige-dim); }
 
+/* ---- public boards (live + results reuse this sheet) -------------------- */
+
+.bc-table { width: 100%; border-collapse: collapse; }
+.bc-table th {
+  font-family: var(--font-mono); font-size: .62rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--beige-dim); text-align: left;
+  padding: 6px 10px; border-bottom: 1px solid var(--line-strong);
+}
+.bc-table td {
+  font-family: var(--font-mono); font-size: .82rem;
+  padding: 8px 10px; border-bottom: 1px solid var(--line);
+}
+.bc-table td:first-child { color: var(--beige-dim); }
+.bc-table .bc-pts { color: var(--acid); font-weight: 700; }
+.bc-table .bc-team { font-family: var(--font-display); font-size: .92rem;
+  text-transform: uppercase; color: var(--ink); }
+
+.bc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.bc-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.bc-row > .bc-card { flex: 1 1 320px; min-width: 0; }
+.bc-big {
+  font-family: var(--font-display); font-size: 2.6rem; line-height: 1;
+  color: var(--acid);
+}
+.bc-big span { color: var(--beige-dim); font-size: 1.2rem; }
+.bc-list { list-style: none; margin: 0; padding: 0; display: flex;
+  flex-direction: column; gap: 8px; }
+.bc-list li { display: flex; gap: 8px; align-items: baseline;
+  font-family: var(--font-mono); font-size: .78rem; }
+.bc-pl { margin: 0; padding-left: 1.2em; font-family: var(--font-mono);
+  font-size: .78rem; color: var(--beige-dim); }
+.bc-pl b { color: var(--ink); }
+
 /* ---- reduced motion ----------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }

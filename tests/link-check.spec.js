@@ -74,6 +74,7 @@ test.afterAll(() => {
 
 /** Pages any visitor can reach without a session. */
 const PAGES = ['/', '/status', '/teams', '/about', '/rules', '/schedule',
+               '/live', '/results',
                '/admin', '/admin-login.html', '/privacy', '/privacy.html',
                '/404.html'];
 

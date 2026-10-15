@@ -32,6 +32,7 @@ __pycache__/
 /qa-*.png
 /pw-*.png
 /playwright-*.png
+/qa-shots/
 
 # Browser-session artifacts — contain exported registration data (PII).
 /.playwright-mcp/

@@ -1,3 +1,0 @@
-V4.7 includes original unbranded tactical vector accents (rifle silhouette, frag grenade, smoke canister, supply crate) and an original fictional operator background image (tactical-operator-bg.webp). These are independent broadcast design assets, not official KRAFTON/BGMI game assets. Team logos, event logos, player portraits, music, and map art must be supplied by the tournament organizer with appropriate permission.
-
-V4.8.1 adds squad-four-operators.webp: an original fictional four-operator group illustration used as a missing-player-image fallback. Do not represent it as an official BGMI character render.

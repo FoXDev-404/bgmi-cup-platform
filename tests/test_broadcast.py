@@ -135,6 +135,11 @@ def main():
         broadcast.migrate(conn)
         conn.commit()
     report("migrate is idempotent", True)
+    with server_conn() as conn:
+        cols = {r["name"] for r in
+                conn.execute("PRAGMA table_info(match_team_results)")}
+        report("R2-3 adjustment columns exist",
+               {"adjustment", "adjustment_reason"} <= cols, str(sorted(cols)))
 
     # ---------- scoring engine (pure) ----------
     print("\n[scoring engine]")
@@ -507,6 +512,63 @@ def main():
                st == 200 and len(t3["players"]) == 4
                and out_p["name"] in names3 and sub["name"] not in names3,
                "status=%s names=%s" % (st, names3))
+
+    # ---------- R2-3: card actions — auto, adjust, reset ----------
+    print("\n[R2-3 card actions]")
+    st, d = j("GET", "/api/admin/matches/%d" % mid, headers=T.ah())
+    dteams = d["state"]["teams"]
+    report("desk payload carries slot + adjustment fields",
+           st == 200 and all("slot" in t and "adjustment" in t for t in dteams),
+           str(dteams[0])[:140])
+
+    st, d = j("POST", "/api/admin/match/%d/team/%s/auto" % (mid, t1),
+              {}, headers=T.ah())
+    t1s = next(t for t in d["state"]["teams"] if t["teamId"] == t1)
+    report("AUTO hands placement back to the engine",
+           st == 200 and t1s.get("placementAuto") is True, str(t1s)[:160])
+    report("AUTO shows in the event log",
+           "AUTO" in json.dumps(d["state"]["events"]))
+
+    st, d = j("GET", "/api/admin/matches/%d" % mid, headers=T.ah())
+    before = next(t for t in d["state"]["teams"] if t["teamId"] == t0)
+    st, d = j("POST", "/api/admin/match/%d/team/%s/adjust" % (mid, t0),
+              {"delta": 4, "reason": "rule 4.2 late drop"}, headers=T.ah())
+    after = next(t for t in d["state"]["teams"] if t["teamId"] == t0)
+    report("adjustment adds to PTS and stores the reason",
+           st == 200 and after["points"] == before["points"] + 4
+           and after["adjustment"] == 4
+           and after["adjustmentReason"] == "rule 4.2 late drop",
+           str(after)[:170])
+    report("adjustment is in the event log",
+           "adjustment +4" in json.dumps(d["state"]["events"]))
+    st, d = j("GET", "/api/admin/audit?teamId=%s" % t0, headers=T.ah())
+    report("adjustment is in the audit log",
+           st == 200 and "match_adjust" in json.dumps(d), str(d)[:140])
+    st, d = j("POST", "/api/admin/match/%d/team/%s/adjust" % (mid, t0),
+              {"delta": 2}, headers=T.ah())
+    report("adjustment without a reason is refused",
+           st == 400 and "reason" in json.dumps(d).lower(), str(d)[:140])
+
+    default_table = {1: 10, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 1}
+    want = default_table.get(after["placement"], 0) + after["kills"] \
+        + after["adjustment"]
+    report("PTS = placement + finishes + adjustment",
+           after["points"] == want,
+           "pts=%s want=%s" % (after["points"], want))
+
+    st, d = j("POST", "/api/admin/match/%d/team/%s/reset" % (mid, t0),
+              {}, headers=T.ah())
+    reset = next(t for t in d["state"]["teams"] if t["teamId"] == t0)
+    report("reset clears placement/finishes/adjustment and revives players",
+           st == 200 and reset["kills"] == 0 and reset["adjustment"] == 0
+           and not reset["placement"] and reset["alive"] == 4
+           and reset["out"] == 0, str(reset)[:180])
+    st, d = j("POST", "/api/admin/match/%d/undo" % mid, {}, headers=T.ah())
+    back = next(t for t in d["state"]["teams"] if t["teamId"] == t0)
+    report("undo restores the pre-reset card (adjustment included)",
+           st == 200 and back["kills"] == before["kills"]
+           and back["adjustment"] == 4 and back["points"] == before["points"] + 4,
+           str(back)[:180])
 
     # ---------- 4-player DB guard + legacy repair ----------
     print("\n[4-player DB guard]")

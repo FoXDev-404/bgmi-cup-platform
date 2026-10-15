@@ -89,6 +89,8 @@ CREATE TABLE IF NOT EXISTS match_team_results (
   placement_auto INTEGER NOT NULL DEFAULT 1,
   kills          INTEGER NOT NULL DEFAULT 0,
   unassigned_finishes INTEGER NOT NULL DEFAULT 0,
+  adjustment     INTEGER NOT NULL DEFAULT 0,
+  adjustment_reason TEXT NOT NULL DEFAULT '',
   points         INTEGER NOT NULL DEFAULT 0,
   eliminated_at  INTEGER,
   PRIMARY KEY (match_id, team_id)
@@ -205,6 +207,12 @@ def migrate(conn):
         conn.execute("ALTER TABLE match_team_results ADD COLUMN "
                      "unassigned_finishes INTEGER NOT NULL DEFAULT 0")
         _backfill_unassigned(conn)
+    # ---- R2-3: manual points adjustment per team (reason logged) ----
+    if "adjustment" not in mtr_cols:
+        conn.execute("ALTER TABLE match_team_results ADD COLUMN "
+                     "adjustment INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE match_team_results ADD COLUMN "
+                     "adjustment_reason TEXT NOT NULL DEFAULT ''")
     conn.executescript(TRIGGERS_SQL)
 
     for k, v in DEFAULT_SCORING_RULES.items():
@@ -315,10 +323,11 @@ def placement_points(position, rules):
     return int(rules["placement"].get(int(position or 0), 0))
 
 
-def compute_points(kills, placement, rules):
-    """matchPoints = kills * kill_points + placement_points (B recalculate)."""
-    return max(0, int(kills)) * max(0, rules["kill_points"]) + \
-        placement_points(placement, rules)
+def compute_points(kills, placement, rules, adjustment=0):
+    """matchPoints = kills * kill_points + placement_points + adjustment."""
+    adj = 0 if adjustment is None else _clamp_int(adjustment, -99, 99)
+    return max(0, max(0, int(kills)) * max(0, rules["kill_points"]) +
+               placement_points(placement, rules) + adj)
 
 
 def squad_wiped(players):
@@ -668,11 +677,14 @@ def undo_last(conn, match_id, who=""):
     team = payload["team"]
     conn.execute(
         "UPDATE match_team_results SET placement = ?, placement_auto = ?, "
-        "kills = ?, unassigned_finishes = ?, points = ?, eliminated_at = ? "
+        "kills = ?, unassigned_finishes = ?, adjustment = ?, "
+        "adjustment_reason = ?, points = ?, eliminated_at = ? "
         "WHERE match_id = ? AND team_id = ?",
         (team["placement"], team["placement_auto"], team["kills"],
-         team.get("unassigned_finishes") or 0, team["points"],
-         team["eliminated_at"], int(match_id), team["team_id"]))
+         team.get("unassigned_finishes") or 0,
+         team.get("adjustment") or 0, team.get("adjustment_reason") or "",
+         team["points"], team["eliminated_at"], int(match_id),
+         team["team_id"]))
     # bench flags restore in safe passes so the 4-player trigger is never
     # tripped mid-restore: deactivate rows the snapshot did not have at all,
     # then snapshot rows that were benched, then reactivate the rest.
@@ -754,7 +766,8 @@ def _resync(conn, match_id):
     for row in view:
         fin = int(row.get("unassigned_finishes") or 0) + \
             sum(int(p["kills"]) for p in row["_players"])
-        pts = compute_points(fin, row["placement"], rules)
+        pts = compute_points(fin, row["placement"], rules,
+                             row.get("adjustment"))
         conn.execute(
             "UPDATE match_team_results SET kills = ?, placement = ?, "
             "eliminated_at = ?, points = ? WHERE match_id = ? AND team_id = ?",
@@ -962,11 +975,75 @@ def set_placement(conn, match_id, team_id, placement, manual=True, who=""):
         "UPDATE match_team_results SET placement = ?, placement_auto = ? "
         "WHERE match_id = ? AND team_id = ?",
         (placement, 1 if not manual else 0, int(match_id), team_id))
-    name, _ = _team_name(conn, team_id)
-    _log_event(conn, match_id, "placement", team_id,
-               "%s pinned to %s place" % (name, ordinal(placement) if placement
-                                          else "no"), snap)
     _resync(conn, match_id)
+    name, _ = _team_name(conn, team_id)
+    if manual:
+        desc = "%s pinned to %s place" % (name, ordinal(placement)
+                                          if placement else "no")
+    else:
+        placed = conn.execute(
+            "SELECT placement FROM match_team_results WHERE match_id = ? "
+            "AND team_id = ?", (int(match_id), team_id)).fetchone()["placement"]
+        desc = "%s placement set to AUTO (%s)" % (
+            name, ordinal(placed) if placed else "pending elimination")
+    _log_event(conn, match_id, "placement", team_id, desc, snap)
+
+
+def adjust_team(conn, match_id, team_id, delta, reason, who=""):
+    """Manual points adjustment for one squad. A reason is mandatory; the
+    change lands in the event feed and the audit log and is undoable."""
+    match = get_match(conn, match_id)
+    if not match or match["status"] not in ("live", "awaiting_verification"):
+        raise ValueError("The match is not live.")
+    _require_team(conn, match_id, team_id)
+    reason = _clamp_str(reason, 120)
+    if not reason:
+        raise ValueError("Give a reason for the points adjustment.")
+    if delta is None or str(delta).strip() == "":
+        raise ValueError("Enter the points to add or remove.")
+    delta = _clamp_int(delta, -100, 100)
+    if delta == 0:
+        raise ValueError("Adjustment is zero — nothing to change.")
+    snap = _snapshot(conn, match_id, team_id)
+    conn.execute(
+        "UPDATE match_team_results SET adjustment = adjustment + ?, "
+        "adjustment_reason = ? WHERE match_id = ? AND team_id = ?",
+        (delta, reason, int(match_id), team_id))
+    _resync(conn, match_id)
+    total = conn.execute(
+        "SELECT adjustment FROM match_team_results WHERE match_id = ? "
+        "AND team_id = ?", (int(match_id), team_id)).fetchone()["adjustment"]
+    name, _ = _team_name(conn, team_id)
+    _log_event(conn, match_id, "adjust", team_id,
+               "%s adjustment %+d — %s (now %+d)" % (name, delta, reason,
+                                                     total), snap)
+    return {"adjustment": total}
+
+
+def reset_team(conn, match_id, team_id, who=""):
+    """Clear one squad's card: placement, finishes, adjustments and all four
+    player rows back to zero. Undoable through the event snapshot."""
+    match = get_match(conn, match_id)
+    if not match or match["status"] not in ("upcoming", "live",
+                                            "awaiting_verification"):
+        raise ValueError("A published match cannot be changed — "
+                         "unpublish it first.")
+    _require_team(conn, match_id, team_id)
+    snap = _snapshot(conn, match_id, team_id)
+    conn.execute(
+        "UPDATE match_team_results SET placement = NULL, placement_auto = 1, "
+        "kills = 0, unassigned_finishes = 0, adjustment = 0, "
+        "adjustment_reason = '', points = 0, eliminated_at = NULL "
+        "WHERE match_id = ? AND team_id = ?", (int(match_id), team_id))
+    conn.execute(
+        "UPDATE player_stats SET kills = 0, damage = 0, status = 'alive', "
+        "auto_eliminated = 0 WHERE match_id = ? AND team_id = ?",
+        (int(match_id), team_id))
+    _resync(conn, match_id)
+    name, _ = _team_name(conn, team_id)
+    _log_event(conn, match_id, "reset_team", team_id,
+               "%s card reset — finishes, placement and adjustments cleared"
+               % name, snap)
 
 
 def ordinal(n):
@@ -1012,7 +1089,7 @@ def match_state(conn, match_id):
     rules = load_rules(conn)
     teams = []
     alive_total = 0
-    for r in _match_teams_rows(conn, match_id):
+    for slot, r in enumerate(_match_teams_rows(conn, match_id), 1):
         pub = team_public_row(conn, r["team_id"], match["group_name"])
         players = []
         alive = knocked = out = 0
@@ -1029,12 +1106,14 @@ def match_state(conn, match_id):
                 out += 1
         if alive or knocked:
             alive_total += 1
-        teams.append(dict(pub, kills=r["kills"],
+        teams.append(dict(pub, slot=slot, kills=r["kills"],
                           unassigned=r["unassigned_finishes"],
+                          adjustment=r["adjustment"],
+                          adjustmentReason=r["adjustment_reason"],
                           placement=r["placement"],
                           placementAuto=bool(r["placement_auto"]),
                           points=compute_points(r["kills"], r["placement"],
-                                                rules),
+                                                rules, r["adjustment"]),
                           eliminatedAt=r["eliminated_at"],
                           players=players,
                           bench=_bench_options(conn, match_id, r["team_id"]),

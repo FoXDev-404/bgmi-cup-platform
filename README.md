@@ -99,10 +99,12 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
 1. Approve teams and draw groups in `/admin` (registration section is the
    source of truth — matches can only contain approved squads of a group).
 2. `/admin/matches` → create a match for a group, check squads in (max 16).
-3. `/admin/control` → **Start match**; log kills, damage, player status;
-   squads are auto-placed as they are eliminated (or set placements by hand);
-   **Undo** reverses any logged action; keyboard: `S` squad focus, `U` undo,
-   `R` refresh.
+3. `/admin/control` → **Start match**; each squad card takes finishes, kills,
+   damage, player status and placement (type a number or use the stepper;
+   **AUTO** hands the pin back to the engine). The gear has **Swap player**,
+   **Manual adjustment** (reason required, audited; PTS = placement + finishes
+   + adjustment) and **Reset team**. **Undo** reverses any logged action;
+   keyboard: `S` start/end, `U` undo, `R` refresh, `ESC` close menus.
 4. **Verify and publish** (gated: every squad needs a placement) — points
    flow into standings, `/live`, `/results` and the overlays immediately.
 5. `/admin/overlays` → copy the 16 overlay URLs into OBS browser sources

@@ -31,11 +31,25 @@ Requested follow-ups after the merge dry run. Safety: demo/seed DB only (backup 
        (`break-screen` → `intermission`).
        Verified: suites 108/104/94, Playwright 8/8, visual smoke green with
        16/16 scene screenshots (qa-shots/overlay-*.png) on demo data.
-- [ ] R2-3. Control desk team card rebuilt to the reference layout — **Not started**
-       slot badge / tag / name+group / FIN·PLACE·PTS / chevron; control row (+FINISH, −,
-       PLACE stepper, AUTO, gear → swap, manual adjustment with reason, reset team);
-       4 player rows (index, IGN + UID, DMG stepper, kill counter, Alive/Knocked/Out icons);
-       eliminated dim + rank badge; conflict badge; compact 16-team grid; responsive.
+- [x] R2-3. Control desk team card rebuilt to the reference layout — **Done**
+       header: slot badge (P#) / tag badge (logo or initials) / tag + full name + group /
+       FIN · PLACE (or —) · PTS / collapse chevron; control row: green `+ FINISH`
+       (unassigned finishes, `−` to take one back), PLACE stepper + typed pin, AUTO,
+       gear menu (swap player / manual adjustment with reason / reset team);
+       exactly 4 player rows: index, IGN + UID, DMG stepper (±100 + typed), finish
+       counter, Alive/Knocked/Out icon buttons (tooltip + aria-label, pressed state
+       highlighted, others dimmed); wiped squads dim + rank badge (`SET AUTO` hint when
+       unplaced); rejected placement sets a `PLACE TAKEN` badge on the card; grid is a
+       stable 3-column lobby order (P# slots) collapsing to 2 then 1; cards fold;
+       actions stay serialized and undoable, every event timestamped.
+       New server-side: `adjustment` + `adjustment_reason` columns (migrated),
+       `compute_points(..., adjustment)` (PTS = placement + finishes + adjustment),
+       `adjust_team()` (reason mandatory, event + audit, undoable), `reset_team()`,
+       `POST .../team/<id>/auto|adjust|reset` routes; undo restores adjustments too.
+       Verified: test_broadcast 119/119 (11 new: schema, AUTO, adjust + audit + no-reason
+       refusal, PTS math, reset, undo), test_api 104, test_admin 94, Playwright 8/8,
+       plus an interactive desk dry run on the demo DB (finish, adjust, swap with a real
+       sub, placement conflict badge, AUTO, undo ×N — all clean, state restored).
 - [ ] R2-4. BGMI points table, configurable — **Not started**
        default 10/6/5/4/3/2/1/1 + 1/finish + manual adjustments (reason + audit); tie-breakers
        points → wins → placement pts → finish pts → last-match placement (configurable);

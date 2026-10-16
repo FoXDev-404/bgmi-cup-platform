@@ -247,6 +247,37 @@ async function waitFor(fn, ms) {
     }
   }
 
+  /* the capture must never block on fonts.googleapis.com — fonts are local */
+  await page.goto(BASE + '/overlay/live?token=' + encodeURIComponent(TOK),
+    { waitUntil: 'load' });
+  await page.evaluate(() => Promise.race([
+    document.fonts.ready,
+    new Promise((r) => setTimeout(r, 2000)),
+  ]));
+  const fonts = await page.evaluate(async () => {
+    const rs = performance.getEntriesByType('resource').map((r) => r.name);
+    const declared = [...document.fonts]
+      .map((f) => f.family)
+      .filter((f) => /Barlow Condensed|Rajdhani/.test(f));
+    const css = await fetch('/assets/fonts/overlay-fonts.css');
+    const cssText = css.ok ? await css.text() : '';
+    const m = cssText.match(/url\((\/assets\/fonts\/[^)]+\.woff2)\)/);
+    const woff = m ? await fetch(m[1]) : null;
+    return {
+      external: rs.filter((n) => /fonts\.googleapis|fonts\.gstatic/.test(n)),
+      declared: declared.length,
+      cssStatus: css.status,
+      cssType: css.headers.get('content-type') || '',
+      woffStatus: woff ? woff.status : 0,
+      woffType: woff ? (woff.headers.get('content-type') || '') : '',
+    };
+  });
+  check('overlay fonts load locally (no Google Fonts request)',
+    fonts.external.length === 0 && fonts.declared >= 10 &&
+    fonts.cssStatus === 200 && /text\/css/.test(fonts.cssType) &&
+    fonts.woffStatus === 200 && /font\/woff2/.test(fonts.woffType),
+    JSON.stringify(fonts));
+
   /* ---------- admin producer: scene dropdown drives the preview ---------- */
   console.log('\n[overlays admin preview]');
   const apage = await ctx.newPage();

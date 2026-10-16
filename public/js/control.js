@@ -28,6 +28,8 @@
   var state = null;           // match_state payload
   var busy = false;           // one action at a time (avoid out-of-order)
   var pending = [];           // queued actions while busy
+  var lastActAt = 0;          // epoch ms of the most recent desk action sent
+  var sseTimer = null;        // coalesces server-echo refreshes
   var timerT = null;
   var folded = {};            // teamId -> true when the card is collapsed
   var conflicts = {};         // teamId -> epoch ms until the badge shows
@@ -279,6 +281,7 @@
      message is toasted; a placement clash also flags the card. */
   function act(path, body, teamId) {
     pending.push(function () {
+      lastActAt = Date.now();
       return BC.post(path, body).then(function (x) {
         if (x.s === 200 && x.d.ok) {
           state = x.d.state;
@@ -842,12 +845,21 @@
 
   /* ---- boot --------------------------------------------------------------- */
 
+  function sseRefresh() {
+    /* Coalesce server echoes: our own POST response already rendered the
+       fresh state, so after a burst of actions the list re-reads once
+       (700 ms after the last one) instead of once per action. Echoes from
+       another operator (stale lastActAt) refresh almost immediately. */
+    clearTimeout(sseTimer);
+    var quiet = 700 - (Date.now() - lastActAt);
+    sseTimer = setTimeout(function () { loadMatches(matchId); },
+      quiet > 0 ? quiet : 60);
+  }
+
   BC.boot(function () {
     applyLayout();
     watchWidth();
     loadMatches();
-    BC.live('/api/admin/stream', function () {
-      loadMatches(matchId);
-    });
+    BC.live('/api/admin/stream', sseRefresh);
   });
 })();

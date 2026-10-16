@@ -518,6 +518,17 @@ function check(name, ok, detail) {
     return c && parseInt(c.querySelector('.bc-squad-stats .bc-stat b').textContent, 10) === n;
   }, [String(bumpTid), bumpBefore + 1], { timeout: 8000 });
   check('live update lands while layout controls are used', true);
+  /* a rapid burst of API actions must still land (SSE echoes coalesce) */
+  const burstBefore = (await GET('/api/admin/matches/' + mid)).d.state
+    .teams[1].kills;
+  for (let i = 0; i < 4; i++) {
+    await POST(`/api/admin/match/${mid}/team/${bumpTid}/kills`, { delta: 1 }, H);
+  }
+  await page.waitForFunction(([t, n]) => {
+    const c = document.querySelector(`.bc-squad[data-team="${t}"]`);
+    return c && parseInt(c.querySelector('.bc-squad-stats .bc-stat b').textContent, 10) === n;
+  }, [String(bumpTid), burstBefore + 4], { timeout: 10000 });
+  check('a burst of API actions still lands on the desk', true);
   await page.waitForTimeout(2200);
   const t1 = await page.textContent('#deskTimer');
   check('match timer keeps ticking through layout changes',

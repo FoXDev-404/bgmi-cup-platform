@@ -85,6 +85,7 @@ CONTENT_TYPES = {
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
     ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
     ".ico": "image/x-icon",
     ".txt": "text/plain; charset=utf-8",
 }
@@ -500,6 +501,9 @@ def db():
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # NORMAL keeps every commit crash-safe while dropping the extra fsync
+    # that can stall for hundreds of ms on busy (OBS recording) disks.
+    conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
 
@@ -1167,13 +1171,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         # Strict CSP — every script is external ('self'), no inline handlers.
         # inline style= attributes remain (style-src unsafe-inline only
-        # affects CSS, not script); Google Fonts for the theme faces.
+        # affects CSS, not script); Google Fonts for the admin/public theme,
+        # while the overlay captures use the local /assets/fonts copies.
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; "
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src https://fonts.gstatic.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data:; "
             "connect-src 'self'; "
             "frame-src 'self'; "

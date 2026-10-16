@@ -830,7 +830,11 @@ def _team_name(conn, team_id):
 
 
 def _resync(conn, match_id):
-    """Re-run squad-wipe cascade + auto placement + points for a match."""
+    """Re-run squad-wipe cascade + auto placement + points for a match.
+
+    Writes only the rows whose values actually changed: a damage edit
+    usually leaves every player and team row as-is, so the desk action
+    stays a handful of statements instead of ~80 no-op UPDATEs."""
     match = get_match(conn, match_id)
     if not match:
         return
@@ -839,14 +843,19 @@ def _resync(conn, match_id):
     view = []
     for t in team_rows:
         players = _team_players(conn, match_id, t["team_id"])
+        before = {p["id"]: (p["status"], p["auto_eliminated"])
+                  for p in players}
         apply_squad_wipe(players)
         for p in players:
-            conn.execute(
-                "UPDATE player_stats SET status = ?, auto_eliminated = ? "
-                "WHERE id = ?", (p["status"], p["auto_eliminated"], p["id"]))
+            if (p["status"], p["auto_eliminated"]) != before[p["id"]]:
+                conn.execute(
+                    "UPDATE player_stats SET status = ?, auto_eliminated = ? "
+                    "WHERE id = ?",
+                    (p["status"], p["auto_eliminated"], p["id"]))
         row = dict(t)
         row["_players"] = players
         view.append(row)
+    before_team = {t["team_id"]: dict(t) for t in team_rows}
     sequence = sync_auto_placements(view, match["sequence"])
     if sequence != match["sequence"]:
         conn.execute("UPDATE matches SET sequence = ? WHERE id = ?",
@@ -856,11 +865,16 @@ def _resync(conn, match_id):
             sum(int(p["kills"]) for p in row["_players"])
         pts = compute_points(fin, row["placement"], rules,
                              row.get("adjustment"))
-        conn.execute(
-            "UPDATE match_team_results SET kills = ?, placement = ?, "
-            "eliminated_at = ?, points = ? WHERE match_id = ? AND team_id = ?",
-            (fin, row["placement"], row["eliminated_at"], pts,
-             int(match_id), row["team_id"]))
+        old = before_team[row["team_id"]]
+        if (old.get("kills"), old.get("placement"), old.get("eliminated_at"),
+                old.get("points")) != (fin, row["placement"],
+                                       row["eliminated_at"], pts):
+            conn.execute(
+                "UPDATE match_team_results SET kills = ?, placement = ?, "
+                "eliminated_at = ?, points = ? WHERE match_id = ? AND "
+                "team_id = ?",
+                (fin, row["placement"], row["eliminated_at"], pts,
+                 int(match_id), row["team_id"]))
 
 
 def _require_team(conn, match_id, team_id):

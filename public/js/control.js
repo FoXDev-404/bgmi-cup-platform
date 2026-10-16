@@ -758,8 +758,7 @@
   $('drawerBack').addEventListener('click', closeDrawer);
   $('floatUndo').addEventListener('click', function () { $('undoBtn').click(); });
 
-  /* keep AUTO honest when the window or the standings mode changes the width,
-     and keep the publish-bar clearance in step with the bar's real height */
+  /* keep AUTO honest when the window or the standings mode changes the width */
   function watchWidth() {
     var el = document.querySelector('.bc-desk-grid');
     if (window.ResizeObserver && el) {
@@ -768,14 +767,6 @@
       }).observe(el);
     } else {
       window.addEventListener('resize', applyLayout);
-    }
-    var bar = document.querySelector('.bc-publish-bar');
-    if (bar && window.ResizeObserver) {
-      var setBar = function () {
-        $('deskBody').style.setProperty('--pubbar', (bar.offsetHeight + 10) + 'px');
-      };
-      new ResizeObserver(setBar).observe(bar);
-      setBar();
     }
   }
 

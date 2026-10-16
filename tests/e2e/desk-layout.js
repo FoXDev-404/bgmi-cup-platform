@@ -632,22 +632,26 @@ function check(name, ok, detail) {
   check('768px: status targets are >= 42px (44px spec)',
     targets.every((t) => t[0] >= 42 && t[1] >= 42), JSON.stringify(targets));
 
-  /* ---------- publish bar never covers the last row ---------- */
+  /* ---------- publish bar flows below the cards, never floats over them ---------- */
   await page.setViewportSize({ width: 1024, height: 800 });
   await page.waitForTimeout(250);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(300);
-  const clear = await page.evaluate(() => {
+  const flow = await page.evaluate(() => {
     const cards = [...document.querySelectorAll('#squadGrid .bc-squad')];
     const bar = document.querySelector('.bc-publish-bar');
-    const lastBottom = Math.max(...cards.map((c) => c.getBoundingClientRect().bottom));
-    return { gap: Math.round(bar.getBoundingClientRect().top - lastBottom),
+    const docTop = (r) => r.top + window.scrollY;
+    const docBottom = (r) => r.bottom + window.scrollY;
+    const lowest = Math.max(...cards.map((c) => docBottom(c.getBoundingClientRect())));
+    return { pos: getComputedStyle(bar).position,
+      gap: Math.round(docTop(bar.getBoundingClientRect()) - lowest),
       pad: getComputedStyle(document.getElementById('deskBody')).paddingBottom };
   });
-  check('sticky publish bar leaves the last card row clear at the bottom',
-    clear.gap >= 0, JSON.stringify(clear));
-  check('publish-bar clearance padding is applied',
-    parseFloat(clear.pad) > 20, clear.pad);
+  check('publish bar sits in flow below every card (never floats over teams)',
+    (flow.pos === 'static' || flow.pos === 'relative') && flow.gap >= 0,
+    JSON.stringify(flow));
+  check('no publish-bar clearance padding is reserved',
+    parseFloat(flow.pad || '0') === 0, JSON.stringify(flow));
 
   check('no page errors', pageErrors.length === 0, pageErrors.join(' | '));
 

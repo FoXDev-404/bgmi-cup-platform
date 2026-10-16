@@ -11,7 +11,7 @@
      - #queue / #groups landings activate the matching tab and flash
      - LIVE chip + match-day-only phase expansion + tab dot while live
      - drawer / pin / icon rail / reload restore, desk STANDINGS tab never
-       overlaps, one drawer at a time, publish bar never covered
+       overlaps, one drawer at a time, publish actions never covered
      - AUTO grid columns refuse pinning with a toast (fixed columns pin fine)
      - keyboard: Alt+W, Escape, focus traps; a11y labels + ordered lists
      - phone: floating button + bottom sheet
@@ -490,16 +490,18 @@ function check(name, ok, detail) {
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(500);
-  const barZ = await page.evaluate(() => {
-    const bar = document.querySelector('.bc-publish-bar');
-    if (!bar || bar.hidden) return 'no bar';
-    const r = bar.getBoundingClientRect();
-    const el = document.elementFromPoint(Math.round(r.left + 40),
+  const pubReach = await page.evaluate(() => {
+    const btn = document.getElementById('publishBtn');
+    if (!btn) return 'no publish button';
+    btn.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const r = btn.getBoundingClientRect();
+    const el = document.elementFromPoint(Math.round(r.left + r.width / 2),
       Math.round(r.top + r.height / 2));
-    return bar.contains(el) ? true : (el ? String(el.className) : 'null');
+    return el && (el === btn || btn.contains(el)) ? true
+      : (el ? String(el.className) : 'null');
   });
-  check('FLOW drawer never covers the verify/publish bar', barZ === true,
-    JSON.stringify(barZ));
+  check('FLOW drawer never covers the verify/publish buttons', pubReach === true,
+    JSON.stringify(pubReach));
 
   // AUTO columns: a pin that would drop the count is refused with a toast
   // (clear flow keys first: a stored rail only shifts the grid 76px and

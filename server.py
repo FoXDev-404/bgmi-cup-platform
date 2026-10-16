@@ -38,6 +38,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
 
 import broadcast
+import flow
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -1620,6 +1621,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": True,
                                    "username": admin[0]["username"],
                                    "csrf": admin[1]})
+        if rest == "flow-status":
+            with DB_LOCK:
+                conn = db()
+                try:
+                    payload = flow.compute(conn)
+                finally:
+                    conn.close()
+            return self.send_json(payload)
         if rest == "registrations":
             return self.admin_queue(qs)
         if rest.startswith("registrations/"):
@@ -2358,6 +2367,9 @@ class Handler(BaseHTTPRequestHandler):
                     conn.execute("DELETE FROM roster_members")
                     conn.execute("DELETE FROM registrations")
                     conn.execute("DELETE FROM groups")
+                    # the DEMO DATA marker dies with the data it describes
+                    conn.execute("DELETE FROM settings "
+                                 "WHERE key = 'demo_seed'")
                     audit(conn, who, None, "purge_all",
                           old="%d teams" % n, new="0")
                     # re-seed overlay defaults with a fresh token

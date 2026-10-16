@@ -1,14 +1,33 @@
-# BGMI Champions Cup — Registration + Broadcast
+# BGMI CUP.26 — Tournament Platform
 
-One project, one server, one database, one login, one theme. Two sections:
+**Four squads. One drop. Zero mercy.** — the tournament platform behind the
+BGMI CUP.26 community cup (Greater Noida · 14 November 2026): one project, one
+server, one database, one login, one theme, covering the whole event.
+
+![Python 3.7+](https://img.shields.io/badge/python-3.7%2B-3776AB)
+![Dependencies](https://img.shields.io/badge/dependencies-none-2EA043)
+![Database](https://img.shields.io/badge/database-SQLite-003B57)
+
+## Screenshots
+
+| Public home — CUP.26 hero | About — the line-up dossier |
+|---|---|
+| ![Public home](docs/screenshots/home.jpg) | ![About](docs/screenshots/lineup.jpg) |
+| Match Control Desk — live scoring | Admin FLOW workflow sidebar |
+| ![Match Control Desk](docs/screenshots/control-desk.jpg) | ![FLOW sidebar](docs/screenshots/control-flow.jpg) |
+| Live match centre (SSE) | OBS broadcast overlay (1920×1080) |
+| ![Live match centre](docs/screenshots/live.jpg) | ![OBS overlay](docs/screenshots/overlay.jpg) |
+
+## What's inside
 
 1. **Registration** — public squad registration with review/confirmation,
    status lookup, approved-teams grid, schedule, and a full admin approval
    workflow (Control Room).
 2. **Broadcast** — match schedule, live control desk (kills, damage, status,
    placements, undo), public live/results pages, 16 original OBS
-   browser-source overlays, and a caster dashboard — all driven from the same approved teams
-   and groups (the registration section is the single source of truth).
+   browser-source overlays, and a caster dashboard — all driven from the same
+   approved teams and groups (the registration section is the single source
+   of truth).
 
 **Stack:** Python 3 standard library only — no pip packages, no build step,
 one SQLite database (`data/registrations.db`). Minimum Python **3.7**
@@ -23,6 +42,7 @@ talk to a tiny bridge at `/socket.io/socket.io.js`).
 server.py            Static file server + JSON API + SQLite + SSE + notify worker
 broadcast.py         Broadcast engine: schema/migrations, scoring, match
                      lifecycle, desk actions, undo, standings, overlay state
+flow.py              FLOW workflow status — NEXT card + step states
 public/              Web root
   *.html             Public pages (index, status, teams, schedule, live,
                      results, about, 404, privacy)
@@ -31,12 +51,14 @@ public/              Web root
   overlay.html       Original broadcast overlay shell — /overlay/<scene>
   overlay.css/.js    Original overlay styles + 16 scene renderers (as-is)
   socket.io/         socket.io.js shim — bridges the overlays to SSE
-  css/               style.css (theme), admin.css, footer.css, control.css
-                     (broadcast admin)
-  js/                nav.js, admin-shell.js (BC bootstrap), per-page scripts
+  css/               style.css (theme), admin.css, admin-flow.css (FLOW
+                     sidebar), control.css (desk), footer.css
+  js/                nav.js, admin-shell.js (BC bootstrap), admin-flow.js
+                     (shared FLOW component), per-page scripts
   assets/, images/   Vendor libs + imagery
-scripts/             create_admin.py, seed_demo.py, backup_db.py, restore_db.py
-tests/               test_api.py, test_admin.py, broadcast specs (Playwright)
+scripts/             create_admin.py, seed_demo.py, backup_db.py,
+                     restore_db.py, verify.bat / verify.sh
+tests/               Python suites, Playwright specs, 11 e2e stages (tests/e2e)
 docs/                api.md, features.md, security.md, testing.md, merge-plan.md
 data/                Live data: registrations.db + uploads/ (gitignored)
 backups/             backup_db.py output (gitignored)
@@ -121,9 +143,20 @@ placement points → finish points → last-match placement (configurable, and
 worth confirming against your event's rulebook). Exports:
 `/api/admin/export/standings.csv` and `/api/admin/export/match/<id>.csv`.
 
+Every admin page also carries the shared **FLOW** workflow sidebar — a NEXT
+card plus phase-by-phase step states (registrations → setup → match day →
+verify), pinnable on wide screens, a drawer on tablets and a bottom sheet on
+phones.
+
 ## Tests
 
+Everything runs against throwaway servers and temporary databases — the live
+`data/registrations.db`, `.env` and the demo server are never touched.
+
 ```powershell
+scripts\verify.bat        # Windows: the entire suite in one command
+scripts/verify.sh         # macOS / Linux equivalent
+
 python tests/test_api.py            # registration/public API suite
 python tests/test_admin.py          # admin workflow suite (includes one 61s wait)
 python tests/test_broadcast.py      # scoring engine + desk/overlay suite
@@ -132,9 +165,12 @@ python tests/test_seed.py           # demo-seed safety rails and scenarios
 npx playwright test                 # browser specs (run `npm install` once first)
 ```
 
-Each Python suite boots its own throwaway server with a temporary database and
-uploads folder, so the live `data/registrations.db` can never be touched.
-Coverage details: [docs/testing.md](docs/testing.md).
+`verify.bat` chains the five Python suites, the Playwright browser specs and
+11 end-to-end stages (`tests/e2e/`, a freshly seeded temp DB on port 8090)
+that drive real workflows — registration, approval, schedules, the live desk
+and publishing, overlays, scoring, security and accessibility — and exits
+non-zero unless every stage is green. Coverage details:
+[docs/testing.md](docs/testing.md).
 
 ## Seed demo data
 

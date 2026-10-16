@@ -3,7 +3,8 @@ rem ============================================================================
 rem  One-command verification for the BGMI project (Windows).
 rem
 rem  Runs, in order:
-rem    1. python tests\test_api.py / test_admin.py / test_broadcast.py
+rem    1. python tests\test_api.py / test_admin.py / test_broadcast.py /
+rem       test_flow.py / test_seed.py
 rem       (each hosts its own throw-away server + DB)
 rem    2. npx playwright test            (specs host their own server + DB)
 rem    3. the ten stage scripts in tests\e2e\, each against a freshly seeded
@@ -44,6 +45,8 @@ echo ==== python suites ====
 python tests\test_api.py || set "FAILED=!FAILED! test_api"
 python tests\test_admin.py || set "FAILED=!FAILED! test_admin"
 python tests\test_broadcast.py || set "FAILED=!FAILED! test_broadcast"
+python tests\test_flow.py || set "FAILED=!FAILED! test_flow"
+python tests\test_seed.py || set "FAILED=!FAILED! test_seed"
 
 echo ==== playwright specs ====
 call npx playwright test --reporter=line || set "FAILED=!FAILED! playwright"

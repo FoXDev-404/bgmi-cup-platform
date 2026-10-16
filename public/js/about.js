@@ -1,9 +1,11 @@
 /* ==========================================================================
-   About — team line-up
+   About — team line-up (tactical dossier cards)
    Edit the TEAM array below to change members.
    Photo lookup is "as named": images/team/<name-lowercased>.png
    (FE_PSYCHO -> images/team/fe_psycho.png). Add `img:` to a member to
    override the path. Missing photo -> initials placeholder in the frame.
+   Card chrome (operator number, dossier ref, status rows) is generated;
+   per-member copy lives in the TEAM array.
    ========================================================================== */
 (function () {
   'use strict';
@@ -11,16 +13,31 @@
   /* ---------------- TEAM CONFIG — edit me ---------------- */
   var PHOTO_DIR = 'images/team/';   /* relative, so it works on any host */
   var PHOTO_EXT = '.png';
+  var PHOTO_VER = '?v=2';           /* bump after replacing a portrait file */
+
+  /* dossier flavour rows shown on every card (design copy, not stats) */
+  var DOSSIER = { status: 'Active', threat: 'Elite', loyalty: 'Unquestioned' };
 
   var TEAM = [
-    { name: 'FE_PSYCHO', role: 'Coach' },
-    { name: 'FE_SAHIL',  role: 'IGL' },
-    { name: 'FE_KANNU',  role: 'Assaulter' }
+    {
+      name: 'FE_PSYCHO',
+      role: 'Coach',
+      ref: '#002-01',
+      skills: ['Strategy', 'Analysis', 'Team Play', 'Leadership'],
+      dossier: ['Tactical Mind', 'Squad Builder', 'Always a Step Ahead']
+    },
+    {
+      name: 'FE_KANNU',
+      role: 'Assaulter',
+      ref: '#002-02',
+      skills: ['Rush', 'Fragging', 'Positioning', 'Team Fight'],
+      dossier: ['Aggressive Entry', 'High Impact', 'Built for the Last Zone']
+    }
   ];
   /* ------------------------------------------------------ */
 
   function photoSrc(m) {
-    return m.img || PHOTO_DIR + String(m.name).toLowerCase() + PHOTO_EXT;
+    return m.img || PHOTO_DIR + String(m.name).toLowerCase() + PHOTO_EXT + PHOTO_VER;
   }
 
   function esc(s) {
@@ -29,7 +46,7 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /* FE_PSYCHO -> "FP", FE_SAHIL -> "FS" */
+  /* FE_PSYCHO -> "FP" */
   function initials(name) {
     var parts = String(name || '').split(/[\s_-]+/).filter(Boolean);
     if (!parts.length) return '?';
@@ -40,18 +57,47 @@
   function cardHtml(m, i) {
     var ini = esc(initials(m.name));
     var num = (i + 1 < 10 ? '0' : '') + (i + 1);
-    return '<article class="ab-card">' +
+    var skills = (m.skills || []).map(function (s) {
+      return '<li>' + esc(s) + '</li>';
+    }).join('');
+    var dossier = (m.dossier || []).map(function (s) {
+      return esc(s);
+    }).join('<i aria-hidden="true">|</i>');
+    return '<article class="ab-op">' +
       '<span class="ab-corner ab-corner-tl" aria-hidden="true"></span>' +
       '<span class="ab-corner ab-corner-tr" aria-hidden="true"></span>' +
       '<span class="ab-corner ab-corner-bl" aria-hidden="true"></span>' +
       '<span class="ab-corner ab-corner-br" aria-hidden="true"></span>' +
-      '<span class="ab-num" aria-hidden="true">' + num + '</span>' +
-      '<div class="ab-frame">' +
-        '<img src="' + esc(photoSrc(m)) + '" alt="' + esc(m.name) + '">' +
-        '<div class="ab-initials" aria-hidden="true">' + ini + '</div>' +
+      '<div class="ab-op-body">' +
+        '<div class="ab-col ab-col-left">' +
+          '<p class="ab-op-id">Operator <b>' + num + '</b></p>' +
+          '<p class="ab-op-meta">Squad dossier<br>Field record<br>' + esc(m.ref || '') + '</p>' +
+          '<p class="ab-op-skills-label">Skills</p>' +
+          '<ul class="ab-op-skills">' + skills + '</ul>' +
+          '<span class="ab-slash" aria-hidden="true">///</span>' +
+        '</div>' +
+        '<div class="ab-op-mid">' +
+          '<div class="ab-frame">' +
+            '<img src="' + esc(photoSrc(m)) + '" alt="' + esc(m.name) + '">' +
+            '<div class="ab-initials" aria-hidden="true">' + ini + '</div>' +
+          '</div>' +
+          '<h3 class="ab-name">' + esc(m.name) + '</h3>' +
+          '<span class="ab-role">' + esc(m.role) + '</span>' +
+        '</div>' +
+        '<div class="ab-col ab-col-right">' +
+          '<span class="ab-barcode" aria-hidden="true"></span>' +
+          '<p class="ab-stat"><span>Status</span><b class="ab-lime">' + esc(DOSSIER.status) + '</b></p>' +
+          '<span class="ab-rule" aria-hidden="true"></span>' +
+          '<p class="ab-stat"><span>Threat level</span><b class="ab-red">' + esc(DOSSIER.threat) + '</b></p>' +
+          '<span class="ab-bars" aria-hidden="true"></span>' +
+          '<span class="ab-rule" aria-hidden="true"></span>' +
+          '<p class="ab-stat"><span>Loyalty</span><b>' + esc(DOSSIER.loyalty) + '</b></p>' +
+        '</div>' +
       '</div>' +
-      '<h2 class="ab-name">' + esc(m.name) + '</h2>' +
-      '<span class="ab-role">' + esc(m.role) + '</span>' +
+      '<p class="ab-op-foot">' +
+        '<span class="ab-op-foot-text">' + dossier + '</span>' +
+        '<span class="ab-slash" aria-hidden="true">///</span>' +
+      '</p>' +
       '</article>';
   }
 

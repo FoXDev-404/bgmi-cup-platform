@@ -26,22 +26,38 @@
   padding: 122px 0 142px;
 }
 
-/* giant cropped watermark behind the hero copy */
+/* giant FEARLESS word straddling the hero/cream boundary — two copies of the
+   same word share one absolute box, each clipped by its own section:
+   hero copy = subtle gray on the black, cream copy = dark charcoal below */
 .ab-wm {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -0.32em;
   z-index: 0;
   font-family: var(--ab-display);
   font-size: 16.5vw;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
-  color: rgba(236, 231, 216, 0.055);
   user-select: none;
   pointer-events: none;
 }
+
+/* zero-height anchor pinned to the hero's bottom edge — the hero copy
+   positions off this, the cream copy off the who section's top edge, so
+   both halves share the same containing-block top (the boundary) and the
+   same -0.6em offset: alignment is exact, not approximate */
+.ab-wm-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+}
+
+.ab-wm-hero { top: -0.6em; color: rgba(236, 231, 216, 0.055); }
+
+.ab-wm-cream { top: -0.6em; color: #2b2c2f; }
 
 .ab-badges {
   display: flex;
@@ -120,6 +136,8 @@
   background: var(--ab-cream);
   color: #35322e;
   padding: 72px 0 78px;
+  position: relative;
+  overflow: hidden;      /* clips the cream half of the FEARLESS word */
 }
 
 .ab-who-head {

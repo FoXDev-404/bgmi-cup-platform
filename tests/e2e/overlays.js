@@ -296,6 +296,14 @@ async function waitFor(fn, ms) {
   check('scene dropdown swaps the preview iframe', swapped,
     'before=' + srcBefore + ' after=' +
     (await apage.getAttribute('#previewFrame', 'src')));
+  const progUrl = await apage.inputValue('#programUrl');
+  check('producer page offers the one-URL program output',
+    progUrl.split('?')[0] === BASE + '/overlay/program',
+    progUrl.split('?')[0]);
+  const sceneBtns = await apage.$$eval('#programSceneBtns [data-scene]',
+    (b) => b.length);
+  check('producer page has a switch button per scene', sceneBtns === 16,
+    String(sceneBtns));
   check('overlays admin: no page errors', apErrors.length === 0,
     apErrors.slice(0, 3).join(' | '));
   await apage.screenshot({ path: path.join(SHOTS, 'admin-overlays-preview.png') });
@@ -385,6 +393,40 @@ async function waitFor(fn, ms) {
     sBefore[team.teamName] + ' -> ' + sWant + ')', sRow, JSON.stringify(sBefore));
   await spage.screenshot({ path: path.join(SHOTS, 'overlay-stalled-sse.png') });
   await stalledCtx.close();
+
+  /* ---------- program output: one URL, switched from the dashboard ---- */
+  console.log('\n[program output]');
+  const sw0 = await POST('/api/admin/overlay-settings',
+    { broadcastScene: 'chicken-dinner' }, H);
+  check('program scene accepted', sw0.s === 200, sw0.s);
+  await page.goto(BASE + '/overlay/program?token=' + encodeURIComponent(TOK),
+    { waitUntil: 'load' });
+  await page.waitForSelector('#broadcast', { timeout: 8000 });
+  const progCls = () => page.$eval('#broadcast', (el) => el.className);
+  const onCD = await page.waitForFunction(() =>
+    document.getElementById('broadcast').className.includes('state-chicken-dinner'),
+    null, { timeout: 8000 }).then(() => true).catch(() => false);
+  check('program page opens on the dashboard scene (chicken-dinner)', onCD,
+    await progCls());
+  const sw1 = await POST('/api/admin/overlay-settings',
+    { broadcastScene: 'intermission' }, H);
+  const flipped = await page.waitForFunction(() =>
+    document.getElementById('broadcast').className.includes('state-intermission'),
+    null, { timeout: 8000 }).then(() => true).catch(() => false);
+  check('switching the scene flips the open program page over SSE', flipped,
+    await progCls());
+  const badScene = await POST('/api/admin/overlay-settings',
+    { broadcastScene: 'definitely-not-a-scene' }, H);
+  check('unknown program scene is refused (400)', badScene.s === 400,
+    badScene.s + ' ' + ((badScene.d || {}).error || ''));
+  const sw2 = await POST('/api/admin/overlay-settings',
+    { broadcastScene: 'live' }, H);
+  const backLive = await page.waitForFunction(() =>
+    document.getElementById('broadcast').className.includes('state-live'),
+    null, { timeout: 8000 }).then(() => true).catch(() => false);
+  check('program page returns live', backLive && sw2.s === 200,
+    await progCls());
+  await page.screenshot({ path: path.join(SHOTS, 'program-output-live.png') });
 
   check('no overlay page errors', pageErrors.length === 0,
     pageErrors.slice(0, 3).join(' | '));

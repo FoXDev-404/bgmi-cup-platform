@@ -361,6 +361,26 @@ def main():
               {"themeColor": "#b6ff3e", "disabled": []}, headers=T.ah())
     report("overlay settings restored", st == 200, str(d)[:120])
 
+    # ---------- program output scene switch ----------
+    st, d = j("POST", "/api/admin/overlay-settings",
+              {"broadcastScene": "chicken-dinner"}, headers=T.ah())
+    report("program scene switch saved", st == 200 and
+           d.get("broadcastScene") == "chicken-dinner", str(d)[:120])
+    st, d = j("GET", "/api/overlay/state/live?token=" + token)
+    report("state payload carries the program scene",
+           st == 200 and d.get("state", {}).get("broadcastState") ==
+           "chicken-dinner", str(d)[:120])
+    st, cfg = j("GET", "/api/admin/overlay-settings", headers=T.ah())
+    report("settings payload carries the program scene",
+           st == 200 and cfg.get("broadcastScene") == "chicken-dinner",
+           str(cfg)[:120])
+    st, d = j("POST", "/api/admin/overlay-settings",
+              {"broadcastScene": "nope"}, headers=T.ah())
+    report("unknown program scene refused (400)", st == 400, "status=%s" % st)
+    st, _ = j("POST", "/api/admin/overlay-settings",
+              {"broadcastScene": "live"}, headers=T.ah())
+    report("program scene restored", st == 200, "status=%s" % st)
+
     # ---------- match lifecycle over HTTP ----------
     print("\n[match lifecycle]")
     groups = approved_by_group()

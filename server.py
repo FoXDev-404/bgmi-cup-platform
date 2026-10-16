@@ -1640,6 +1640,10 @@ class Handler(BaseHTTPRequestHandler):
         # OBS overlay pages: /overlay/<name> serves the single overlay shell
         if path.startswith("/overlay/") or path == "/overlay":
             name = path[len("/overlay/"):].rstrip("/").lower()
+            if name == "program":
+                # unpinned program output: follows the overlays page's
+                # scene switcher (broadcast_scene) instead of a fixed scene
+                return self.serve_static("/overlay.html")
             if path == "/overlay" or name not in broadcast.OVERLAY_NAMES:
                 # bare /overlay or an unknown name: producer page explains them
                 return self.redirect("/admin/overlays")
@@ -1730,6 +1734,7 @@ class Handler(BaseHTTPRequestHandler):
                 "introTeam": pairs.get("intro_team", ""),
                 "pushedCard": pushed,
                 "disabled": disabled,
+                "broadcastScene": pairs.get("broadcast_scene", "live"),
                 "overlays": list(broadcast.OVERLAY_NAMES)})
         if rest == "scoring-rules":
             with DB_LOCK:
@@ -2664,6 +2669,13 @@ class Handler(BaseHTTPRequestHandler):
                                  if n in broadcast.OVERLAY_NAMES][:20]
                         broadcast.set_bsetting(conn, "disabled",
                                                json.dumps(names))
+                    if "broadcastScene" in data:
+                        scene = str(data.get("broadcastScene") or "").strip()
+                        if scene not in broadcast.OVERLAY_NAMES:
+                            return self.send_json(
+                                {"ok": False,
+                                 "error": "Unknown overlay scene."}, 400)
+                        broadcast.set_bsetting(conn, "broadcast_scene", scene)
                     audit(conn, who, None, "overlay_settings",
                           new=str(sorted(k for k in data)))
                     conn.commit()
@@ -2675,7 +2687,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": True,
                                    "token": pairs.get("token", ""),
                                    "themeColor": pairs.get("theme_color",
-                                                           "#b6ff3e")})
+                                                           "#b6ff3e"),
+                                   "broadcastScene": pairs.get(
+                                       "broadcast_scene", "live")})
 
         if rest == "scoring-rules":
             try:

@@ -51,7 +51,7 @@ DEFAULT_OVERLAY_SETTINGS = {
     "intro_team": "",            # team_id pinned on the team-intro overlay
     "pushed_card": "",           # JSON card pushed from the caster desk
     "disabled": "",              # JSON list of hidden overlay names
-    "broadcast_scene": "live",   # fallback scene for an unpinned overlay page
+    "broadcast_scene": "live",   # Program output scene (one-URL switcher on the overlays page)
 }
 
 # Overall-table tie-breakers, applied in order after total points.

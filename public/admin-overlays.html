@@ -87,6 +87,20 @@
         title="Overlay preview" scrolling="no"></iframe></div>
     </section>
 
+    <!-- program output: one OBS URL, scenes switched from here -->
+    <section class="bc-card" style="margin-top:18px;">
+      <h2 class="bc-h2">Program output <span class="bc-dim">&mdash; one URL for OBS</span></h2>
+      <p class="bc-p">Add just this URL as a Browser source in OBS (1920&times;1080, custom CSS empty) and switch scenes with the buttons below &mdash; the OBS browser source follows within a second, no refresh.</p>
+      <div class="bc-form-row">
+        <div style="flex:1; min-width:260px;">
+          <label class="bc-label" for="programUrl">Program URL</label>
+          <input class="bc-input" id="programUrl" readonly>
+        </div>
+        <button class="bc-btn" id="copyProgramBtn">Copy URL</button>
+      </div>
+      <div id="programSceneBtns" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+    </section>
+
     <!-- overlay cards -->
     <section style="margin-top:18px;">
       <h2 class="bc-h2">Browser sources</h2>
@@ -138,7 +152,7 @@
 
   <script src="/js/nav.js?v=1"></script>
   <script src="/js/admin-shell.js?v=1"></script>
-  <script src="/js/overlays.js?v=1"></script>
+  <script src="/js/overlays.js?v=2"></script>
   <script src="/js/admin-flow.js?v=2"></script>
 </body>
 </html>

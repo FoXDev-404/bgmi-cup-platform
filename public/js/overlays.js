@@ -30,6 +30,38 @@
       encodeURIComponent(cfg.token);
   }
 
+  function programUrl() {
+    return location.origin + '/overlay/program?token=' +
+      encodeURIComponent(cfg.token);
+  }
+
+  /* One OBS source: scene buttons push broadcast_scene; every open program
+     page picks the change up over SSE and swaps its layout in place. */
+  function renderProgram() {
+    $('programUrl').value = programUrl();
+    $('programSceneBtns').innerHTML = cfg.overlays.map(function (name) {
+      var on = name === (cfg.broadcastScene || 'live');
+      return '<button class="bc-btn' + (on ? ' bc-btn--go' : '') +
+        '" data-scene="' + esc(name) + '">' + esc(name) +
+        (on ? ' &middot; on air' : '') + '</button>';
+    }).join('');
+    $('programSceneBtns').querySelectorAll('[data-scene]').forEach(
+      function (b) {
+        b.addEventListener('click', function () {
+          var name = b.dataset.scene;
+          if (name === (cfg.broadcastScene || 'live')) return;
+          BC.post('/api/admin/overlay-settings', { broadcastScene: name })
+            .then(function (x) {
+              if (x.s === 200 && x.d.ok) {
+                cfg.broadcastScene = x.d.broadcastScene || name;
+                renderProgram();
+                BC.toast('Program scene \u2192 ' + name);
+              } else BC.toast(x.d.error || 'Switch failed', true);
+            });
+        });
+      });
+  }
+
   /* ---- cards -------------------------------------------------------------- */
 
   function render() {
@@ -96,6 +128,18 @@
   /* picking a scene from the dropdown must swap the preview too */
   $('previewPick').addEventListener('change', loadPreview);
 
+  $('copyProgramBtn').addEventListener('click', function () {
+    if (!cfg) { BC.toast('Still loading', true); return; }
+    var url = programUrl();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        BC.toast('Copied program URL');
+      }, function () { fallbackCopy(url); });
+    } else {
+      fallbackCopy(url);
+    }
+  });
+
   /* ---- settings ------------------------------------------------------------ */
 
   function load() {
@@ -110,6 +154,7 @@
         }).join('');
       }
       render();
+      renderProgram();
       loadPreview();
     });
   }

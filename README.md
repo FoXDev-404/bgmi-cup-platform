@@ -1,7 +1,8 @@
-# BGMI CUP.26 — Tournament Platform
+# BGMI CUP — Tournament Platform
 
 **Four squads. One drop. Zero mercy.** — the tournament platform behind the
-BGMI CUP.26 community cup (Greater Noida · 14 November 2026): one project, one
+BGMI CUP community cups: currently powering **CUP.26** (Greater Noida ·
+14 November 2026), and built to run every edition after it. One project, one
 server, one database, one login, one theme, covering the whole event.
 
 ![Python 3.7+](https://img.shields.io/badge/python-3.7%2B-3776AB)

@@ -37,7 +37,8 @@ Every registration starts **pending**. The Control Room (`/admin`) provides:
 - **`/rules`** — the curated house rules/format/fair-play text (same content
   shown during registration, no invented policies).
 - **`/schedule`** (when the teams feed is enabled) — schedule note published
-  from Settings, timezone label, last-updated stamp; plain-text rendering.
+  from Settings, a per-match plan (group, map, start time) maintained on the
+  matches page, timezone label, last-updated stamp; plain-text rendering.
 - **`/about`** — team cards driven by the `TEAM` array in `public/js/about.js`.
 
 ## Registration UX
@@ -78,7 +79,7 @@ without `--overwrite`. Both scripts print row counts only — no PII.
 | `public/status.html` | Public "Check your status" page (Reg ID + captain phone/email, last-updated + next steps) |
 | `public/teams.html` | Public approved-teams grid with search + group filter (off unless enabled in Settings) |
 | `public/rules.html` | `/rules` — curated house rules, tournament config, format, fair play (same text as registration) |
-| `public/schedule.html` | `/schedule` — settings-driven day-of schedule + timezone + last-updated (gated with `/teams`) |
+| `public/schedule.html` | `/schedule` — settings-driven day-of schedule + match plan (start times) + timezone + last-updated (gated with `/teams`) |
 | `public/admin.html` | Control Room — session login, queue, team detail, groups, audit, notifications, settings |
 | `public/admin-login.html` | Control Room login screen (served by `/admin` when logged out) |
 | `public/about.html` | About page (Who we are + team cards), served at `/about` too |
@@ -94,7 +95,7 @@ without `--overwrite`. Both scripts print row counts only — no PII.
 | `public/assets/vendor/` | qrcode + jsPDF (for squad-pass PDF/QR) |
 | `public/images/team/` | Team photos read by the About page (`fe_psycho.png` etc.) |
 | `scripts/create_admin.py` | Create/rotate an admin account (scrypt-hashed) |
-| `scripts/seed_demo.py` | Backup-first demo reseed: 32 anime squads 16/16 in Group A+B, one scheduled match per group, DEMO DATA badge |
+| `scripts/seed_demo.py` | Backup-first demo reseed: 32 anime squads 16/16 in Group A+B, one scheduled match per group with start times, DEMO DATA badge |
 | `scripts/backup_db.py` | Consistent online backup of `registrations.db` (integrity-checked) |
 | `scripts/restore_db.py` | Restore a backup (temp file + atomic replace, `--overwrite` guard) |
 | `tests/test_api.py` | End-to-end API suite (104 checks, self-hosted + isolated by default) |

@@ -138,6 +138,20 @@
   margin: 4px 0 10px; letter-spacing: .06em;
 }
 .bc-match-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.bc-match-when {
+  font-family: var(--font-mono); font-size: .7rem; color: var(--beige-dim);
+  letter-spacing: .05em; margin: 0 0 4px;
+}
+.bc-match-when b { color: var(--acid); font-weight: 700; }
+.bc-link {
+  border: 0; background: none; color: var(--acid); cursor: pointer;
+  font: inherit; padding: 0 2px; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.bc-link:hover { text-shadow: 0 0 8px rgba(182, 255, 62, .6); }
+.bc-match-sched { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
+.bc-match-sched input { flex: 1 1 190px; min-width: 0; }
+input[type="datetime-local"] { color-scheme: dark; }
 
 .bc-checkin-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 10px; }
 .bc-checkin {
@@ -416,6 +430,15 @@
 }
 .bc-publish-bar .bc-problem { font-family: var(--font-mono); font-size: .74rem; color: #f2c14e; }
 
+/* the standings drawer floats over the desk — while it is open the sticky
+   publish bar stops clear of it, so it never covers the drawer's team rows
+   (below 900px the drawer is a full-width overlay; dim-back handles it) */
+@media (min-width: 900px) {
+  body.bc-drawer-open .bc-publish-bar {
+    margin-right: calc(min(340px, 92vw) + 16px);
+  }
+}
+
 /* ---- operator layout: toolbar, densities, standings modes ---------------- */
 
 .bc-toolbar {
@@ -641,8 +664,13 @@ body.bc-focus .bc-desk-top { margin-bottom: 10px; }
 
 /* ---- caster ------------------------------------------------------------- */
 
-.bc-caster-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .bc-caster-grid { grid-template-columns: 1fr; } }
+.bc-caster-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .bc-caster-grid { grid-template-columns: minmax(0, 1fr); } }
+/* the pinned FLOW sidebar takes 312px — stack the columns once they no
+   longer fit, so the standings table is never clipped off-screen */
+@media (max-width: 1620px) {
+  body.af-pinned:not(.af-rail) .bc-caster-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .bc-timeline { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto;
   font-family: var(--font-mono); font-size: .72rem; }
 .bc-timeline li { padding: 6px 0; border-bottom: 1px dashed var(--line);

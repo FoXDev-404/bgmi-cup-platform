@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS matches (
   started_at    TEXT,
   ended_at      TEXT,
   published_at  TEXT,
-  notes         TEXT DEFAULT ''
+  notes         TEXT DEFAULT '',
+  starts_at     TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS match_team_results (
   match_id       INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -223,6 +224,10 @@ def migrate(conn):
                      "adjustment INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE match_team_results ADD COLUMN "
                      "adjustment_reason TEXT NOT NULL DEFAULT ''")
+    # ---- per-match scheduled start (datetime-local string) ----
+    match_cols = {r["name"] for r in conn.execute("PRAGMA table_info(matches)")}
+    if "starts_at" not in match_cols:
+        conn.execute("ALTER TABLE matches ADD COLUMN starts_at TEXT DEFAULT ''")
     conn.executescript(TRIGGERS_SQL)
 
     for k, v in DEFAULT_SCORING_RULES.items():
@@ -334,6 +339,21 @@ def _clamp_int(value, lo, hi):
 
 def _clamp_str(value, limit):
     return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+
+_STARTS_AT_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})")
+
+
+def clean_starts_at(value):
+    """datetime-local string -> 'YYYY-MM-DDTHH:MM'; '' clears it.
+    Anything else raises, so the API answers 400 instead of storing junk."""
+    s = str(value or "").strip()
+    if not s:
+        return ""
+    m = _STARTS_AT_RE.match(s)
+    if not m:
+        raise ValueError("Schedule time must look like 2026-11-14T18:00.")
+    return "%s-%s-%sT%s:%s" % m.groups()
 
 
 def check_overlay_token(conn, token):
@@ -496,24 +516,44 @@ def eligible_teams(conn, group_name):
         "ORDER BY r.team_name", (group_name,))]
 
 
-def create_match(conn, group_name, map_name="Erangel", notes="", who=""):
+def create_match(conn, group_name, map_name="Erangel", notes="", who="",
+                 starts_at=""):
     group_name = _clamp_str(group_name, 20)
     if not group_name:
         raise ValueError("Pick a group for the match.")
     map_name = _clamp_str(map_name, 24) or "Erangel"
     if map_name not in MAPS:
         raise ValueError("Unknown map. Choose from: %s" % ", ".join(MAPS))
+    starts_at = clean_starts_at(starts_at)
     number = next_match_number(conn)
     conn.execute(
         "INSERT INTO matches (match_number, group_name, map, status, "
-        "created_at, notes) VALUES (?, ?, ?, 'upcoming', ?, ?)",
-        (number, group_name, map_name, now_iso(), _clamp_str(notes, 300)))
+        "created_at, notes, starts_at) VALUES (?, ?, ?, 'upcoming', ?, ?, ?)",
+        (number, group_name, map_name, now_iso(), _clamp_str(notes, 300),
+         starts_at))
     match_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
     label = (group_name if group_name.lower().startswith("group ")
              else "Group " + group_name)
     _log_event(conn, match_id, "create", None,
-               "Match %d created — %s on %s" % (number, label, map_name))
+               "Match %d created — %s on %s%s" % (
+                   number, label, map_name,
+                   (" — starts " + starts_at) if starts_at else ""))
     return get_match(conn, match_id)
+
+
+def set_match_time(conn, match_id, starts_at, who=""):
+    """Set or clear a match's scheduled start. Allowed on any match status."""
+    match = get_match(conn, match_id)
+    if not match:
+        raise ValueError("Match not found.")
+    value = clean_starts_at(starts_at)
+    conn.execute("UPDATE matches SET starts_at = ? WHERE id = ?",
+                 (value, int(match_id)))
+    _log_event(conn, int(match_id), "schedule", None,
+               "Match %d start time %s" % (
+                   match["match_number"],
+                   ("set to " + value) if value else "cleared"))
+    return value
 
 
 def set_lineup(conn, match_id, team_ids):
@@ -1174,7 +1214,7 @@ def match_state(conn, match_id):
     return {"match": {k: match[k] for k in
                       ("id", "match_number", "group_name", "map", "status",
                        "created_at", "started_at", "ended_at", "published_at",
-                       "notes")},
+                       "notes", "starts_at")},
             "rules": rules, "teams": teams, "teamsAlive": alive_total,
             "publishProblem": problem,
             "events": event_rows(conn, match_id, 40)}

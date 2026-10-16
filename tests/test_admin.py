@@ -449,6 +449,9 @@ def main():
            and d.get("timezone") == "Asia/Kolkata"
            and bool(d.get("updatedAt")),
            "body=%s" % d)
+    report("public schedule exposes the match plan list",
+           isinstance(d.get("matches"), list),
+           "matches=%r" % (d.get("matches"),))
     j("POST", "/api/admin/settings", {"public_teams": False}, headers=T.ah())
     st, d = T.jhttp("GET", "/api/public/schedule")
     report("schedule hidden again after the toggle",

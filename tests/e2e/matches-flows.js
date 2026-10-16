@@ -147,11 +147,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('unknown map -> 400', badMap.s === 400 &&
     /Unknown map/.test((badMap.d || {}).error || ''),
     badMap.s + ' ' + ((badMap.d || {}).error || ''));
+  const badTime = await POST('/api/admin/matches',
+    { group: 'E2E Arena', map: 'Erangel', startsAt: '14/11/2026' },
+    { 'X-Admin-CSRF': csrf });
+  check('bad schedule time -> 400', badTime.s === 400 &&
+    /Schedule time/.test((badTime.d || {}).error || ''),
+    badTime.s + ' ' + ((badTime.d || {}).error || ''));
 
   /* ---------- create + list + detail ---------- */
   console.log('\n[3. create match, list, detail]');
   const created = await POST('/api/admin/matches', {
     group: 'E2E Arena', map: 'Erangel', notes: 'E2E lobby notes',
+    startsAt: '2026-11-14T20:00',
     teamIds: [stta.id, sttb.id],
   }, { 'X-Admin-CSRF': csrf });
   check('match created with a 2-squad lineup', created.s === 200 && created.d.ok &&
@@ -165,12 +172,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     created.d.state.match.group_name === 'E2E Arena' &&
     created.d.state.match.map === 'Erangel' &&
     created.d.state.match.notes === 'E2E lobby notes');
+  check('match carries the scheduled start',
+    created.d.state.match.starts_at === '2026-11-14T20:00',
+    created.d.state.match.starts_at);
 
   const list = await GET('/api/admin/matches');
   const row = (list.d.matches || []).find((m) => m.id === mid);
   check('match list shows it (2 squads, 0 placed)',
     !!row && row.team_count === 2 && row.placed_count === 0,
     JSON.stringify(row));
+  check('match list carries the start time for the cards',
+    !!row && row.starts_at === '2026-11-14T20:00', JSON.stringify(row));
   const detail = await GET('/api/admin/matches/' + mid);
   check('detail lists 6 eligible squads of the group',
     detail.s === 200 && (detail.d.eligible || []).length === 6,
@@ -330,12 +342,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.selectOption('#newGroup', 'E2E Arena');
   await page.selectOption('#newMap', 'Sanhok');
   await page.fill('#newNotes', 'UI created');
+  const hasStarts = await page.locator('#newStarts').isVisible();
+  check('create form has a Starts at picker', hasStarts);
+  await page.fill('#newStarts', '2026-11-15T18:45');
   await page.click('#createForm button[type=submit]');
   await page.waitForTimeout(900);
   const afterUi = await GET('/api/admin/matches');
   const uiMatch = (afterUi.d.matches || [])
     .find((m) => m.notes === 'UI created' && m.id !== mid);
   check('UI create made a new match', !!uiMatch, JSON.stringify(afterUi.d.matches));
+  check('UI create carried the start time',
+    !!uiMatch && uiMatch.starts_at === '2026-11-15T18:45',
+    JSON.stringify(uiMatch));
   const drawer = await page.locator('#checkinCard').isVisible();
   const boxes = await page.locator('#checkinList input[type=checkbox]').count();
   check('check-in drawer opened with the 6 eligible squads',
@@ -343,6 +361,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.screenshot({ path: path.join(SHOTS, 'admin-matches-1440.png'),
     fullPage: true });
   await page.click('#checkinCancel');
+  await page.click(`[data-schededit="${uiMatch.id}"]`);
+  await page.fill(`[data-schedin="${uiMatch.id}"]`, '2026-11-15T21:00');
+  await page.click(`[data-schedsave="${uiMatch.id}"]`);
+  await page.waitForTimeout(900);
+  const afterSched = await GET('/api/admin/matches');
+  const schedRow = (afterSched.d.matches || []).find((m) => m.id === uiMatch.id);
+  check('inline time editor saves from the card',
+    !!schedRow && schedRow.starts_at === '2026-11-15T21:00',
+    JSON.stringify(schedRow));
   page.once('dialog', (d) => d.accept());
   await page.click(`[data-del="${uiMatch.id}"]`);
   await page.waitForTimeout(800);

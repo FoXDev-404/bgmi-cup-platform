@@ -71,7 +71,7 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
 | `/` | Registration |
 | `/status` | Status lookup |
 | `/teams` | Approved teams grid |
-| `/schedule` | Schedule + group draw |
+| `/schedule` | Schedule + group draw + match times |
 | `/live` | Live match centre (SSE) |
 | `/results` | Standings, group tables, match results |
 | `/about` · `/privacy.html` · `/rules` | Info pages |
@@ -83,7 +83,7 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
 | Route | Page |
 |---|---|
 | `/admin` | Registration approval dashboard |
-| `/admin/matches` | Match schedule + check-in + scoring rules |
+| `/admin/matches` | Match schedule + start times + check-in + scoring rules |
 | `/admin/control` | Match Control Desk (drive a live match) |
 | `/admin/overlays` | Overlay producer (URLs, token, event logo, preview) |
 | `/admin/caster` | Caster dashboard + push-stat-card |

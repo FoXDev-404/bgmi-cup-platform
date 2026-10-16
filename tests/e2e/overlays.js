@@ -247,6 +247,28 @@ async function waitFor(fn, ms) {
     }
   }
 
+  /* ---------- admin producer: scene dropdown drives the preview ---------- */
+  console.log('\n[overlays admin preview]');
+  const apage = await ctx.newPage();
+  const apErrors = [];
+  apage.on('pageerror', (e) => apErrors.push(String((e && e.message) || e)));
+  await apage.goto(BASE + '/admin/overlays', { waitUntil: 'load' });
+  await apage.waitForSelector('#previewPick', { timeout: 10000 });
+  await apage.waitForTimeout(700);
+  const srcBefore = await apage.getAttribute('#previewFrame', 'src');
+  await apage.selectOption('#previewPick', 'frag-leaders');
+  const swapped = await apage.waitForFunction(() => {
+    const f = document.getElementById('previewFrame');
+    return f && f.src.indexOf('/overlay/frag-leaders') !== -1;
+  }, null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check('scene dropdown swaps the preview iframe', swapped,
+    'before=' + srcBefore + ' after=' +
+    (await apage.getAttribute('#previewFrame', 'src')));
+  check('overlays admin: no page errors', apErrors.length === 0,
+    apErrors.slice(0, 3).join(' | '));
+  await apage.screenshot({ path: path.join(SHOTS, 'admin-overlays-preview.png') });
+  await apage.close();
+
   /* ---------- SSE fan-out ---------- */
   console.log('\n[SSE fan-out]');
   const c1 = sseClient('/api/overlay/stream/live?token=' + encodeURIComponent(TOK));

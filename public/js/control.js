@@ -99,6 +99,7 @@
       $('drawerBack').hidden = true;
       $('drawerTab').hidden = true;
       $('sideDrawer').classList.remove('bc-drawer--open');
+      document.body.classList.remove('bc-drawer-open');
       if (name === 'bottom') {
         if (aside.parentNode !== $('sideBottom')) $('sideBottom').appendChild(aside);
         $('sideBottom').hidden = false;
@@ -153,12 +154,14 @@
   }
   function openDrawer() {
     $('sideDrawer').classList.add('bc-drawer--open');
+    document.body.classList.add('bc-drawer-open');
     $('drawerBack').hidden = false;
     $('drawerTab').hidden = true;
     updateUndoFloat();
   }
   function closeDrawer() {
     $('sideDrawer').classList.remove('bc-drawer--open');
+    document.body.classList.remove('bc-drawer-open');
     $('drawerBack').hidden = true;
     if ($('deskBody').dataset.side === 'drawer') $('drawerTab').hidden = false;
     updateUndoFloat();

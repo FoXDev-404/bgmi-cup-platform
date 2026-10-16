@@ -378,6 +378,35 @@ def main():
     report("new match starts 'upcoming'",
            (state.get("match") or {}).get("status") == "upcoming")
 
+    # ---- scheduled start time (matches page + /schedule) ----
+    st, d = j("POST", "/api/admin/matches/%d/schedule" % mid,
+              {"startsAt": "2026-11-14T18:30"}, headers=T.ah())
+    report("schedule time saves on the match",
+           st == 200
+           and d["state"]["match"]["starts_at"] == "2026-11-14T18:30",
+           str(d)[:160])
+    st, d = j("POST", "/api/admin/matches/%d/schedule" % mid,
+              {"startsAt": "tomorrow-ish"}, headers=T.ah())
+    report("a malformed schedule time is refused (400)", st == 400,
+           str(d)[:120])
+    st, d = j("POST", "/api/admin/matches",
+              {"group": gname, "startsAt": "14/11/2026"}, headers=T.ah())
+    report("create refuses a malformed schedule time (400)", st == 400,
+           str(d)[:120])
+    mn = (state.get("match") or {}).get("match_number")
+    j("POST", "/api/admin/settings",
+      {"public_teams": True, "schedule_note": "bc-test plan"}, headers=T.ah())
+    st, pub = T.jhttp("GET", "/api/public/schedule")
+    pm = next((x for x in (pub.get("matches") or [])
+               if x.get("number") == mn), None)
+    report("public schedule lists the match and its start time",
+           st == 200 and pm is not None
+           and pm.get("startsAt") == "2026-11-14T18:30"
+           and pm.get("map") == "Erangel", str(pub)[:200])
+    report("public schedule payload carries no PII",
+           no_pii(json.dumps(pub)), "payload leaked PII")
+    j("POST", "/api/admin/settings", {"public_teams": False}, headers=T.ah())
+
     # start with no squads checked in -> refused
     st, d = j("POST", "/api/admin/matches/%d/status" % mid,
               {"status": "live"}, headers=T.ah())

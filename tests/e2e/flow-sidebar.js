@@ -432,12 +432,42 @@ function check(name, ok, detail) {
     cols: getComputedStyle(document.getElementById('squadGrid'))
       .gridTemplateColumns.split(' ').filter(Boolean).length,
     hscroll: document.documentElement.scrollWidth > window.innerWidth + 1,
+    footerLeft: document.querySelector('.footer')
+      ? Math.round(document.querySelector('.footer').getBoundingClientRect().left)
+      : null,
   }));
   check('pin docks the sidebar at 1920', pin.pinned);
   check('pinning keeps the chosen grid columns', pin.cols === colsBefore,
     pin.cols + ' vs ' + colsBefore);
   check('pinned mode adds no horizontal scroll', !pin.hscroll);
+  check('pinned mode shifts the footer clear of the rail',
+    pin.footerLeft === null || pin.footerLeft >= 311,
+    'footerLeft=' + pin.footerLeft);
   await page.screenshot({ path: shot('flow-sidebar-pinned-1920.png') });
+
+  /* the pinned rail must not clip other admin pages either: at 1366 the
+     caster grid cannot hold two columns next to 312px of sidebar, so it
+     stacks — and nothing may overflow horizontally */
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto(BASE + '/admin/caster', { waitUntil: 'load' });
+  await page.waitForTimeout(1300);
+  const casterPin = await page.evaluate(() => {
+    const grid = document.querySelector('.bc-caster-grid');
+    return {
+      pinned: document.body.classList.contains('af-pinned'),
+      cols: grid ? getComputedStyle(grid).gridTemplateColumns
+        .split(' ').filter(Boolean).length : -1,
+      hscroll: document.documentElement.scrollWidth > window.innerWidth + 1,
+    };
+  });
+  check('pinned caster at 1366 stacks and never clips (no h-scroll)',
+    casterPin.pinned && casterPin.cols === 1 && !casterPin.hscroll,
+    JSON.stringify(casterPin));
+  await page.screenshot({ path: shot('flow-sidebar-caster-1366.png') });
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.goto(BASE + '/admin/control', { waitUntil: 'load' });
+  await page.waitForTimeout(1500);
+  await ensureOpen();
   await page.click('#afCollapse');
   await page.waitForTimeout(400);
   check('collapse switches to the icon rail',
@@ -515,6 +545,20 @@ function check(name, ok, detail) {
   check('desk STANDINGS drawer opens',
     await page.evaluate(() => document.getElementById('sideDrawer')
       .classList.contains('bc-drawer--open')));
+  const pubClear = await page.evaluate(() => {
+    const bar = document.querySelector('.bc-publish-bar');
+    const dw = document.getElementById('sideDrawer');
+    const b = bar.getBoundingClientRect();
+    const d = dw.getBoundingClientRect();
+    return {
+      open: dw.classList.contains('bc-drawer--open'),
+      flag: document.body.classList.contains('bc-drawer-open'),
+      barRight: Math.round(b.right), drawerLeft: Math.round(d.left),
+    };
+  });
+  check('publish bar stops clear of the open standings drawer',
+    pubClear.open && pubClear.flag &&
+    pubClear.barRight <= pubClear.drawerLeft + 1, JSON.stringify(pubClear));
   await page.evaluate(() => document.getElementById('afTab').click());
   await page.waitForTimeout(400);
   const od1 = await page.evaluate(() => ({

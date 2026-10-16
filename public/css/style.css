@@ -50,6 +50,28 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 ::selection { background: var(--acid); color: #0c0d10; }
 
 /* ============================================================
+   SCROLLBARS — brushed rail, acid grip
+   (Chrome/Safari/Edge use the ::-webkit-* pseudo; setting
+   scrollbar-width/-color in Blink disables those, so that pair
+   lives behind a Firefox-only support query)
+   ============================================================ */
+
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #454a52, #23262c);
+  border: 3px solid var(--bg); border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--acid); }
+::-webkit-scrollbar-thumb:active { background: #d9ff8a; }
+::-webkit-scrollbar-corner { background: var(--bg); }
+
+@supports (-moz-appearance: none) {
+  html { scrollbar-color: #3a3f48 rgba(255, 255, 255, 0.06); }
+  * { scrollbar-width: thin; }
+}
+
+/* ============================================================
    FIXED OVERLAYS — grain, CRT, vignette
    ============================================================ */
 

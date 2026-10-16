@@ -1558,6 +1558,12 @@ class Handler(BaseHTTPRequestHandler):
                         "schedule": get_setting(conn, "schedule_note", ""),
                         "timezone": get_setting(conn, "timezone", "Asia/Kolkata"),
                         "updatedAt": get_setting(conn, "schedule_updated", ""),
+                        "matches": [
+                            {"number": m["match_number"],
+                             "group": m["group_name"], "map": m["map"],
+                             "startsAt": m["starts_at"] or "",
+                             "status": m["status"]}
+                            for m in broadcast.list_matches(conn)],
                     }
                 finally:
                     conn.close()
@@ -2399,7 +2405,8 @@ class Handler(BaseHTTPRequestHandler):
                         conn.execute("BEGIN IMMEDIATE")
                         match = broadcast.create_match(
                             conn, data.get("group"), data.get("map", "Erangel"),
-                            data.get("notes", ""), who)
+                            data.get("notes", ""), who,
+                            starts_at=data.get("startsAt", ""))
                         if data.get("teamIds") is not None:
                             broadcast.set_lineup(conn, match["id"],
                                                  data.get("teamIds"))
@@ -2417,7 +2424,7 @@ class Handler(BaseHTTPRequestHandler):
             broadcast.publish_update()
             return self.send_json({"ok": True, "state": state})
 
-        m = re.match(r"^matches/(\d+)(?:/(checkin|status|publish|unpublish|reset))?$",
+        m = re.match(r"^matches/(\d+)(?:/(checkin|status|publish|unpublish|reset|schedule))?$",
                      rest)
         if m:
             mid = int(m.group(1))
@@ -2457,6 +2464,12 @@ class Handler(BaseHTTPRequestHandler):
                         elif action == "reset":
                             broadcast.reset_match(conn, mid, who)
                             audit(conn, who, None, "match_reset")
+                        elif action == "schedule":
+                            value = broadcast.set_match_time(
+                                conn, mid, data.get("startsAt", ""), who)
+                            audit(conn, who, None, "match_schedule",
+                                  new="match %d — %s" % (
+                                      mid, value or "cleared"))
                         else:
                             raise ValueError("Unknown match action.")
                         conn.commit()

@@ -166,13 +166,13 @@
   background: #0e1014; border-right: 1px solid var(--line-strong, rgba(236,231,216,.22));
   padding: 14px 12px 24px; overflow-y: auto;
 }
-body.af-pinned .pan { margin-left: 312px; }
+body.af-pinned .pan, body.af-pinned .footer { margin-left: 312px; }
 body.af-pinned .af-drawer, body.af-pinned .af-back,
 body.af-pinned .af-sheet, body.af-pinned .af-sheet-back { display: none; }
 
 /* collapsed rail: numbers + tooltips */
 body.af-pinned.af-rail .af-pin { width: 64px; padding: 14px 6px 24px; }
-body.af-pinned.af-rail .pan { margin-left: 76px; }
+body.af-pinned.af-rail .pan, body.af-pinned.af-rail .footer { margin-left: 76px; }
 body.af-pinned.af-rail .af-title, body.af-pinned.af-rail .af-next-t,
 body.af-pinned.af-rail .af-next-a, body.af-pinned.af-rail .af-lab,
 body.af-pinned.af-rail .af-badge, body.af-pinned.af-rail .af-tag,

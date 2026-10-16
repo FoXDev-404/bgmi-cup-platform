@@ -156,10 +156,14 @@ try:
             "GROUP BY g.name")]
         report("groups split evenly", sorted(per_group) == [16, 16], str(per_group))
         matches = [dict(r) for r in c.execute(
-            "SELECT group_name, status FROM matches")]
+            "SELECT group_name, status, starts_at FROM matches")]
         report("one scheduled match per group",
                len(matches) == 2 and all(m["status"] == "upcoming" for m in matches)
                and sorted(m["group_name"] for m in matches) == ["Group A", "Group B"],
+               str(matches))
+        report("seeded matches carry their start times",
+               {m["group_name"]: m["starts_at"] for m in matches} ==
+               {"Group A": "2026-11-14T16:00", "Group B": "2026-11-14T17:30"},
                str(matches))
         lineups = [r[0] for r in c.execute(
             "SELECT COUNT(*) FROM match_team_results GROUP BY match_id")]
@@ -222,9 +226,12 @@ try:
             "SELECT status, COUNT(*) AS c FROM matches GROUP BY status")}
         report("3 matches: opener published + 2 upcoming",
                statuses == {"published": 1, "upcoming": 2}, str(statuses))
-        pub = c.execute("SELECT id, group_name FROM matches "
+        pub = c.execute("SELECT id, group_name, starts_at FROM matches "
                         "WHERE status = 'published'").fetchone()
         report("opener is Group A", pub and pub["group_name"] == "Group A")
+        report("opener keeps its start time",
+               pub and pub["starts_at"] == "2026-11-14T14:00",
+               pub and pub["starts_at"])
         places = [r[0] for r in c.execute(
             "SELECT placement FROM match_team_results WHERE match_id = ? "
             "ORDER BY placement", (pub["id"],))]

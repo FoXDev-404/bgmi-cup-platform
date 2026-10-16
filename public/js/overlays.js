@@ -93,6 +93,8 @@
     frame.style.transform = 'scale(' + scale + ')';
   }
   window.addEventListener('resize', scalePreview);
+  /* picking a scene from the dropdown must swap the preview too */
+  $('previewPick').addEventListener('change', loadPreview);
 
   /* ---- settings ------------------------------------------------------------ */
 

@@ -386,7 +386,8 @@ def parse_args(argv):
 
 def _play_opener(conn, broadcast, group, lineup):
     match = broadcast.create_match(conn, group, "Erangel",
-                                   "Group stage opener (played)", "seed")
+                                   "Group stage opener (played)", "seed",
+                                   starts_at="2026-11-14T14:00")
     broadcast.set_lineup(conn, match["id"], lineup)
     broadcast.start_match(conn, match["id"], "seed")
     kills = [8, 6, 5, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0]
@@ -489,11 +490,13 @@ def seed(server, broadcast, scenario, with_results=False, uploads_dir=None):
                 matches["opener"] = _play_opener(conn, broadcast, "Group A",
                                                  group_a[:16])
             m_a = broadcast.create_match(conn, "Group A", "Erangel",
-                                         "Group stage - scheduled", "seed")
+                                         "Group stage - scheduled", "seed",
+                                         starts_at="2026-11-14T16:00")
             broadcast.set_lineup(conn, m_a["id"], group_a[:16])
             matches["group_a"] = m_a["id"]
             m_b = broadcast.create_match(conn, "Group B", "Miramar",
-                                         "Group stage - scheduled", "seed")
+                                         "Group stage - scheduled", "seed",
+                                         starts_at="2026-11-14T17:30")
             broadcast.set_lineup(conn, m_b["id"], group_b[:16])
             matches["group_b"] = m_b["id"]
             conn.commit()

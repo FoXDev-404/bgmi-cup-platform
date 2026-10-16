@@ -292,6 +292,57 @@
   }
 }
 
+/* ---- schedule page: match plan (rendered by schedule.js) ---- */
+
+.sched-h {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(237, 230, 211, 0.55);
+  margin: 20px 0 10px;
+}
+
+.sched-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sched-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border: 1px solid rgba(237, 230, 211, 0.14);
+  border-left: 3px solid rgba(182, 255, 62, 0.5);
+  border-radius: 0 8px 8px 0;
+  background: rgba(237, 230, 211, 0.04);
+}
+
+.sched-row time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--acid);
+  white-space: nowrap;
+}
+
+.sched-what {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  color: rgba(237, 230, 211, 0.85);
+}
+
+.sched-row--live {
+  border-left-color: var(--coral, #d9534f);
+  background: rgba(217, 83, 79, 0.07);
+}
+
+.sched-row--live time { color: var(--coral, #d9534f); }
+
+.sched-row--done { opacity: 0.55; }
+
 @media (prefers-reduced-motion: reduce) {
 
   *,

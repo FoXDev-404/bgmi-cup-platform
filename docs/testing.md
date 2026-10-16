@@ -2,10 +2,10 @@
 
 ```powershell
 python tests/test_api.py           # 104 checks
-python tests/test_admin.py         # 96 checks (waits 61s once for the public lookup bucket)
-python tests/test_broadcast.py     # 139 checks (scoring engine, desk, overlays, purge)
+python tests/test_admin.py         # 97 checks (waits 61s once for the public lookup bucket)
+python tests/test_broadcast.py     # 144 checks (scoring engine, desk, overlays, purge)
 python tests/test_flow.py          # admin FLOW workflow-status endpoint + status logic
-python tests/test_seed.py          # 41 checks (seed rails, scenarios, backups, env)
+python tests/test_seed.py          # 43 checks (seed rails, scenarios, backups, env)
 npx playwright test                # browser specs (tests/, Chromium; run `npm install` once)
 ```
 
@@ -49,8 +49,9 @@ registrations.
 
 `tests/test_broadcast.py` covers: migrations, the scoring engine + tie-breakers,
 admin gating, published standings and live state (PII-free), overlay tokens and
-SSE fan-out, the full match lifecycle, desk actions (kills, placements,
-adjustments, swaps, undo), publish rules, CSV exports and the purge.
+SSE fan-out, the full match lifecycle (incl. schedule-time validation and the
+public match plan), desk actions (kills, placements, adjustments, swaps, undo),
+publish rules, CSV exports and the purge.
 
 `tests/test_flow.py` covers the admin FLOW workflow-status endpoint (auth gate,
 counts/statuses/labels only, demo flag) and the pure status logic.

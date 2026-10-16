@@ -14,6 +14,15 @@
     return !n ? '' : (/^group\b/i.test(n) ? n : 'Group ' + n);
   }
 
+  /* 'YYYY-MM-DDTHH:MM' (local) -> '14 Nov, 04:00 pm' for the match cards. */
+  function fmtStarts(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, {
+      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+    });
+  }
+
   /* ---- render ---------------------------------------------------------- */
 
   function statusStamp(status) {
@@ -42,6 +51,18 @@
       esc(m.map) + ' &middot; ' + m.team_count + ' squads &middot; ' +
       m.placed_count + '/' + m.team_count + ' placed</div>' +
       statusStamp(m.status) +
+      '<div class="bc-match-when">' +
+      (m.starts_at ? '<b>Starts</b> ' + esc(fmtStarts(m.starts_at))
+                   : 'No time set') +
+      ' <button class="bc-link" data-schededit="' + m.id + '">' +
+      (m.starts_at ? 'edit' : 'set time') + '</button></div>' +
+      '<div class="bc-match-sched hidden" data-sched="' + m.id + '">' +
+      '<input class="bc-input" type="datetime-local" data-schedin="' + m.id +
+      '" value="' + esc(m.starts_at || '') + '" aria-label="Starts at">' +
+      '<button class="bc-btn bc-btn--go" data-schedsave="' + m.id +
+      '">Save</button>' +
+      '<button class="bc-btn" data-schedcancel="' + m.id + '">Cancel</button>' +
+      '</div>' +
       '<div class="bc-match-acts">' + acts.join('') +
       '<a class="bc-btn" href="/admin/control?match=' + m.id + '">Desk &rarr;</a>' +
       '</div></article>';
@@ -65,6 +86,34 @@
         BC.post('/api/admin/matches/' + id, { delete: true }).then(function (x) {
           if (x.s === 200 && x.d.ok) { BC.toast('Match deleted'); load(); }
           else BC.toast(x.d.error || 'Delete failed', true);
+        });
+      });
+    });
+    list.querySelectorAll('[data-schededit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var row = list.querySelector('[data-sched="' + b.dataset.schededit + '"]');
+        row.classList.remove('hidden');
+        row.querySelector('input').focus();
+      });
+    });
+    list.querySelectorAll('[data-schedcancel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        list.querySelector('[data-sched="' + b.dataset.schedcancel + '"]')
+          .classList.add('hidden');
+      });
+    });
+    list.querySelectorAll('[data-schedsave]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.dataset.schedsave;
+        var val = list.querySelector('[data-schedin="' + id + '"]').value;
+        BC.post('/api/admin/matches/' + id + '/schedule',
+                { startsAt: val }).then(function (x) {
+          if (x.s === 200 && x.d.ok) {
+            BC.toast(val ? 'Match time saved' : 'Match time cleared');
+            load();
+          } else {
+            BC.toast(x.d.error || 'Save failed', true);
+          }
         });
       });
     });
@@ -125,12 +174,14 @@
     BC.post('/api/admin/matches', {
       group: $('newGroup').value,
       map: $('newMap').value,
-      notes: $('newNotes').value
+      notes: $('newNotes').value,
+      startsAt: $('newStarts').value
     }).then(function (x) {
       if (x.s === 200 && x.d.ok) {
         var n = x.d.state.match.match_number;
         BC.toast('Match ' + n + ' created');
         $('newNotes').value = '';
+        $('newStarts').value = '';
         var newId = x.d.state.match.id;
         load().then(function () { openCheckin(newId); });
       } else {

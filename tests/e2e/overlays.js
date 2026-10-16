@@ -42,7 +42,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* raw SSE client over node:http (the event itself is only a change signal) */
 function sseClient(pathWithQuery) {
   const u = new URL(BASE + pathWithQuery);
-  const client = { events: 0, status: 0, req: null, close() {} };
+  const client = { events: 0, hbs: 0, status: 0, req: null, close() {} };
   client.ready = new Promise((resolve) => {
     client.req = http.get({
       hostname: u.hostname, port: u.port, path: u.pathname + u.search,
@@ -58,7 +58,8 @@ function sseClient(pathWithQuery) {
         while ((i = buf.indexOf('\n\n')) >= 0) {
           const frame = buf.slice(0, i);
           buf = buf.slice(i + 2);
-          if (/^data:/m.test(frame)) client.events += 1;
+          if (/^event: hb$/m.test(frame)) client.hbs += 1;
+          else if (/^data:/m.test(frame)) client.events += 1;
         }
       });
       resolve();
@@ -322,6 +323,8 @@ async function waitFor(fn, ms) {
     c1.events > base2[0] && c2.events > base2[1] && c3.events > base2[2], 6000);
   check('a second publish fans out again', fanned2,
     JSON.stringify([c1.events - base2[0], c2.events - base2[1], c3.events - base2[2]]));
+  const hbSeen = await waitFor(() => c1.hbs >= 1, 20000);
+  check('idle stream heartbeats reach the client (hb)', hbSeen, 'hb=' + c1.hbs);
   c1.close(); c2.close(); c3.close();
 
   /* ---------- desk change -> overlay row, through SSE ---------- */
@@ -348,6 +351,40 @@ async function waitFor(fn, ms) {
   check('overlay row picks the finish up over SSE (before ' +
     before[team.teamName] + ' -> ' + want + ')', rowUp,
     JSON.stringify(before));
+
+  /* ---------- silently stalled SSE (proxy half-open) still updates ---- */
+  console.log('\n[silent SSE watchdog]');
+  const stalledCtx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  await stalledCtx.addInitScript(() => {
+    window.__overlayHbSilenceMs = 3000;   // shrink the watchdog for the test
+    window.EventSource = function () {    // opens, then never delivers
+      const self = this;
+      this.close = function () {};
+      this.addEventListener = function () {};
+      setTimeout(function () { if (self.onopen) self.onopen(); }, 0);
+    };
+  });
+  const spage = await stalledCtx.newPage();
+  await spage.goto(BASE + '/overlay/live?token=' + encodeURIComponent(TOK),
+    { waitUntil: 'load' });
+  await spage.waitForSelector('#teams .row', { timeout: 8000 });
+  const sBefore = await spage.$$eval('#teams .row', (rows) => Object.fromEntries(
+    rows.map((r) => [r.querySelector('.name').textContent,
+                     r.querySelector('.kills').textContent.trim()])));
+  const sWant = String(Number(sBefore[team.teamName]) + 1);
+  const sKill = await POST(`/api/admin/match/${liveMatch.id}/team/${team.teamId}/kills`,
+    { delta: 1 }, H);
+  check('stalled-SSE desk kill accepted', sKill.s === 200,
+    sKill.s + ' ' + ((sKill.d || {}).error || ''));
+  const sRow = await spage.waitForFunction(([name, target]) => {
+    const row = [...document.querySelectorAll('#teams .row')]
+      .find((r) => r.querySelector('.name').textContent === name);
+    return row && row.querySelector('.kills').textContent.trim() === String(target);
+  }, [team.teamName, sWant], { timeout: 12000 }).then(() => true).catch(() => false);
+  check('watchdog polling updates a silently-stalled overlay (' +
+    sBefore[team.teamName] + ' -> ' + sWant + ')', sRow, JSON.stringify(sBefore));
+  await spage.screenshot({ path: path.join(SHOTS, 'overlay-stalled-sse.png') });
+  await stalledCtx.close();
 
   check('no overlay page errors', pageErrors.length === 0,
     pageErrors.slice(0, 3).join(' | '));

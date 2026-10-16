@@ -1336,7 +1336,10 @@ class Handler(BaseHTTPRequestHandler):
         return peer
 
     def log_message(self, fmt, *args):
-        print("[%s] %s" % (datetime.now().strftime("%H:%M:%S"), fmt % args))
+        msg = fmt % args
+        # never echo an overlay token into stdout (hosts keep these logs)
+        msg = re.sub(r"token=[^&\s\"]+", "token=REDACTED", msg)
+        print("[%s] %s" % (datetime.now().strftime("%H:%M:%S"), msg))
 
     # ---- static files -----------------------------------------------------
 
@@ -1364,14 +1367,16 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- server-sent events ------------------------------------------------
 
-    SSE_KEEPALIVE = 15          # seconds between ": ping" comments
+    SSE_KEEPALIVE = 15          # seconds between keepalive frames (: ping + hb)
 
     def sse_stream(self, topic):
         """Stream broadcast.HUB events on `topic` as SSE.
 
         One connection per page; the client refetches its state endpoint on
-        every event (the event itself is only a change signal). Cleaned up on
-        any write failure so closed tabs never leak threads."""
+        every event (the event itself is only a change signal). Idle streams
+        send ": ping" plus a client-visible "hb" heartbeat so a stalled
+        connection is detectable. Cleaned up on any write failure so closed
+        tabs never leak threads."""
         self.close_connection = True
         _, token, q = broadcast.HUB.subscribe(topic)
         try:
@@ -1388,7 +1393,10 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     payload = q.get(timeout=self.SSE_KEEPALIVE)
                 except queue.Empty:
-                    self.wfile.write(b": ping\n\n")
+                    # ": ping" keeps proxies from idling the stream; the named
+                    # "hb" event is client-visible so the overlay shim can
+                    # tell a live-but-quiet stream from a silently stalled one.
+                    self.wfile.write(b": ping\n\nevent: hb\ndata: {}\n\n")
                     self.wfile.flush()
                     continue
                 data = json.dumps(payload).encode("utf-8")

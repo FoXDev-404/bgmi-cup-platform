@@ -7,9 +7,17 @@
  *   'connect'            fired with the first payload
  * It reads the merged server's token-gated endpoints:
  *   GET /api/overlay/state/<scene>?token=…   (JSON snapshot)
- *   GET /api/overlay/stream/<scene>?token=…  (SSE change signals)
- * with a 2 s polling fallback whenever SSE is unavailable or drops.
- * The overlay files themselves are untouched by this bridge.
+ *   GET /api/overlay/stream/<scene>?token=…  (SSE change signals + "hb")
+ *
+ * SSE is the fast path. The server also sends a named "hb" event at least
+ * every ~15 s; a silence watchdog treats ~3 missed heartbeats as a dead
+ * stream. That is the OBS failure mode this guards against: proxies (e.g.
+ * Railway's edge) can leave a connection open but silently stop delivering
+ * data, which never fires an EventSource error. When the watchdog trips it
+ * falls back to 2 s state polling AND re-establishes SSE; polling stops as
+ * soon as real data/hb arrives, so a healthy stream costs zero extra
+ * requests. A 403/404 state fetch means a stale token/scene in this URL, so
+ * polling slows to 15 s (with one console warning) instead of hammering.
  */
 (function () {
   'use strict';
@@ -30,6 +38,16 @@
   }
 
   function createSocket() {
+    var HB_SILENCE_MS = 45000;      // ~3 missed heartbeats means the stream died
+    var WATCHDOG_MS = 5000;         // how often silence is checked
+    var RECONNECT_GAP_MS = 40000;   // throttle forced SSE reconnects
+    var POLL_FAST_MS = 2000;        // fallback cadence while SSE is broken
+    var POLL_SLOW_MS = 15000;       // rejected token/scene: don't hammer
+    try {
+      var over = parseInt(window.__overlayHbSilenceMs, 10);  // test hook
+      if (over > 0) HB_SILENCE_MS = over;
+    } catch (e) { /* keep the default */ }
+
     var listeners = {};
     var api = {
       on: function (ev, fn) {
@@ -44,7 +62,9 @@
       },
       emit: function () { return api; },
       close: function () {
-        if (source) source.close();
+        if (source) { try { source.close(); } catch (e) { /* done */ } }
+        source = null;
+        if (watchdog) { clearInterval(watchdog); watchdog = null; }
         stopPolling();
       }
     };
@@ -62,7 +82,9 @@
     try { token = new URLSearchParams(location.search).get('token') || ''; }
     catch (e) { /* no token -> the endpoints answer 403 */ }
     var qs = '?token=' + encodeURIComponent(token);
-    var source = null, poll = null, sawPayload = false;
+    var source = null, poll = null, pollMs = 0, watchdog = null;
+    var sawPayload = false, warnedAuth = false;
+    var lastDataAt = Date.now(), lastReconnectAt = 0;
 
     function apply(json) {
       if (!json || !json.ok || !json.state) return;
@@ -72,32 +94,85 @@
 
     function fetchState() {
       fetch('/api/overlay/state/' + scene + qs, { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (r) {
+          if (!r.ok) { noteFetchFailure(r.status); return null; }
+          noteFetchOk();
+          return r.json();
+        })
         .then(function (j) { if (j) apply(j); })
-        .catch(function () { /* transient - keep the last state on screen */ });
+        .catch(function () { /* transient - keep the current cadence */ });
     }
 
-    function startPolling() {
-      if (poll) return;
-      fetchState();
-      poll = setInterval(fetchState, 2000);
+    function noteFetchFailure(status) {
+      if (status !== 403 && status !== 404) return;   // 5xx etc: transient
+      if (!warnedAuth && window.console) {
+        warnedAuth = true;
+        console.warn('[overlay] state fetch rejected (HTTP ' + status +
+          ') - the token or scene in this overlay URL is invalid or stale.');
+      }
+      setPoll(POLL_SLOW_MS);                          // pointless to hammer
+    }
+
+    function noteFetchOk() {
+      warnedAuth = false;
+      if (poll && pollMs !== POLL_FAST_MS) setPoll(POLL_FAST_MS);
+    }
+
+    function setPoll(ms) {
+      if (poll && pollMs === ms) return;
+      stopPolling();
+      fetchState();                                   // immediate first pass
+      pollMs = ms;
+      poll = setInterval(fetchState, ms);
     }
 
     function stopPolling() {
       if (poll) { clearInterval(poll); poll = null; }
+      pollMs = 0;
+    }
+
+    function ensurePolling() {
+      if (!poll) setPoll(POLL_FAST_MS);
+    }
+
+    function openStream() {
+      if (source) { try { source.close(); } catch (e) { /* done */ } }
+      try {
+        source = new EventSource('/api/overlay/stream/' + scene + qs);
+      } catch (e) {
+        source = null;
+        ensurePolling();
+        return;
+      }
+      lastDataAt = Date.now();
+      source.onopen = function () {
+        lastDataAt = Date.now();     // bounded credit until the first heartbeat
+      };
+      source.onerror = ensurePolling;   // EventSource retries on its own
+      source.onmessage = function () {
+        lastDataAt = Date.now();
+        stopPolling();                  // real data: SSE is proven live again
+        fetchState();
+      };
+      source.addEventListener('hb', function () {
+        lastDataAt = Date.now();        // heartbeat: stream is alive
+        stopPolling();
+      });
+    }
+
+    function watchdogTick() {
+      if (Date.now() - lastDataAt <= HB_SILENCE_MS) return;
+      ensurePolling();                  // cover updates while SSE is repaired
+      if (Date.now() - lastReconnectAt < RECONNECT_GAP_MS) return;
+      lastReconnectAt = Date.now();
+      openStream();                     // fresh connection for the next window
     }
 
     function connect() {
-      fetchState();                       // first paint / polling baseline
-      if (!window.EventSource) { startPolling(); return; }
-      try {
-        source = new EventSource('/api/overlay/stream/' + scene + qs);
-        source.onopen = stopPolling;      // SSE is live: drop the fallback
-        source.onerror = startPolling;    // EventSource retries on its own
-        source.onmessage = fetchState;    // a change signal: refetch
-      } catch (e) {
-        startPolling();
-      }
+      fetchState();                     // first paint / polling baseline
+      if (!window.EventSource) { ensurePolling(); return; }
+      openStream();
+      watchdog = setInterval(watchdogTick, WATCHDOG_MS);
     }
 
     setTimeout(connect, 0);

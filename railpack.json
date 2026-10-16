@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "python",
+  "deploy": {
+    "startCommand": "python server.py",
+    "variables": {
+      "HOST": "0.0.0.0",
+      "BGMI_DB": "/data/registrations.db",
+      "BGMI_UPLOADS": "/data/uploads"
+    }
+  }
+}

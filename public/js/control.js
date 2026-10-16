@@ -19,7 +19,11 @@
     return !n ? '' : (/^group\b/i.test(n) ? n : 'Group ' + n);
   }
 
-  var matchId = null;         // currently open match
+  // ?match=<id> (FLOW "NEXT" links) preselects that match on first load
+  var matchId = (function () {
+    var m = /[?&]match=(\d+)/.exec(window.location.search);
+    return m ? parseInt(m[1], 10) : null;
+  })();                       // currently open match
   var matches = [];           // list for the picker
   var state = null;           // match_state payload
   var busy = false;           // one action at a time (avoid out-of-order)
@@ -225,7 +229,10 @@
         return;
       }
       $('deskEmpty').classList.add('hidden');
-      if (wanted && String(wanted) !== sel.value) sel.value = String(wanted);
+      if (wanted &&
+          sel.querySelector('option[value="' + wanted + '"]')) {
+        sel.value = String(wanted);
+      }
       matchId = parseInt(sel.value, 10);
       loadState();
     });

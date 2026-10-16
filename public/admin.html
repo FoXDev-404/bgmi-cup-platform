@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/admin.css?v=5">
   <link rel="stylesheet" href="css/status.css?v=1">
   <link rel="stylesheet" href="css/footer.css?v=1">
+  <link rel="stylesheet" href="css/admin-flow.css?v=1">
 </head>
 <body>
 
@@ -49,7 +50,7 @@
         <h1 class="adm-title">Control room</h1>
         <p class="adm-user">signed in as <b id="whoAmI">&hellip;</b></p>
       </div>
-      <div class="adm-actions">
+      <div class="adm-actions" id="exports">
         <button type="button" class="adm-btn" id="refreshBtn">&#8635; Refresh</button>
         <a class="adm-btn" href="/api/admin/export/approved.csv" id="expApproved">&#8681; Approved CSV</a>
         <a class="adm-btn" href="/api/admin/export/groups.csv" id="expGroups">&#8681; Groups CSV</a>
@@ -86,6 +87,7 @@
 
     <!-- ================= QUEUE ================= -->
     <section id="tabQueue" role="tabpanel" aria-labelledby="tabBtnQueue">
+    <span class="af-anchor" id="queue" aria-hidden="true"></span>
 
       <div class="adm-chips" id="statusChips" aria-label="Filter by status">
         <button class="adm-chip adm-chip--active" data-status="all" aria-pressed="true">All <b id="chipAll">0</b></button>
@@ -142,6 +144,7 @@
 
     <!-- ================= GROUPS ================= -->
     <section id="tabGroups" class="hidden" role="tabpanel" aria-labelledby="tabBtnGroups">
+    <span class="af-anchor" id="groups" aria-hidden="true"></span>
       <div class="adm-toolbar">
         <span class="adm-slots" id="groupSlots">Approved 0 / 16</span>
         <label class="adm-sort" for="lockGlobal">
@@ -171,6 +174,7 @@
 
     <!-- ================= AUDIT ================= -->
     <section id="tabAudit" class="hidden" role="tabpanel" aria-labelledby="tabBtnAudit">
+    <span class="af-anchor" id="audit" aria-hidden="true"></span>
       <div class="adm-table-wrap">
         <table class="adm-table adm-table--audit">
           <thead>
@@ -190,6 +194,7 @@
 
     <!-- ================= SETTINGS ================= -->
     <section id="tabSettings" class="hidden" role="tabpanel" aria-labelledby="tabBtnSettings">
+    <span class="af-anchor" id="settings" aria-hidden="true"></span>
       <div class="adm-settings">
         <div class="adm-set-card">
           <h2 class="adm-h2">Slot limit</h2>
@@ -294,5 +299,6 @@
   </footer>
 
   <script src="js/panel.js?v=2"></script>
+  <script src="js/admin-flow.js?v=1"></script>
 </body>
 </html>

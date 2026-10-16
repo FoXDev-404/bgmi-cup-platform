@@ -59,8 +59,8 @@ set "VERIFY_ADMIN_USER=verifyadmin"
 set "VERIFY_ADMIN_PASSWORD=verify-pass-2026"
 
 for %%S in (public-site registration-flows status-lookup admin-flows ^
-            matches-flows control-desk desk-layout scoring-check overlays ^
-            security-a11y) do (
+            matches-flows control-desk desk-layout flow-sidebar scoring-check ^
+            overlays security-a11y) do (
   call :reset
   if errorlevel 1 (
     echo [verify] could not reset the environment - aborting

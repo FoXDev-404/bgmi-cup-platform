@@ -223,6 +223,13 @@
   var mode = 'drawer';
   var pinnedRequested = lsGet(KEY.mode) === 'pinned';
   var isOpen = false;
+
+  /* the open flag also drives the desk-side demotion of the publish bar /
+     undo float (body.af-flow-open, styled in admin-flow.css) */
+  function setOpen(open) {
+    isOpen = open;
+    document.body.classList.toggle('af-flow-open', open);
+  }
   var lastFocus = null;
 
   function mountNav(host) {
@@ -277,7 +284,7 @@
       sheet.hidden = true;
       back.hidden = true;
       sheetBack.hidden = true;
-      isOpen = false;
+      setOpen(false);
       lsSet(KEY.open, '0');        // the drawer closed, so is no longer "open"
     } else if (mode === 'sheet') {
       mountNav(sheet);
@@ -293,7 +300,7 @@
     if (mode === 'pinned') return;
     closeDeskDrawer();               // one drawer at a time
     lastFocus = document.activeElement;
-    isOpen = true;
+    setOpen(true);
     lsSet(KEY.open, '1');
     if (mode === 'sheet') {
       sheet.hidden = false;
@@ -313,7 +320,7 @@
 
   function closeFlow() {
     if (!isOpen) return;
-    isOpen = false;
+    setOpen(false);
     lsSet(KEY.open, '0');
     if (mode === 'sheet') {
       sheet.classList.remove('af-open');
@@ -893,6 +900,21 @@
     }
   }
 
+  /* While the publish bar is on screen the phone FAB fades out, so the pill
+     never sits chopped under the verify/publish actions while the user
+     scrolls past them. */
+  function watchFabZones() {
+    if (!global.IntersectionObserver) return;
+    var bar = document.querySelector('.bc-publish-bar');
+    if (!bar) return;
+    var io = new global.IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        fab.classList.toggle('af-fab-quiet', en.isIntersecting);
+      });
+    }, { threshold: 0 });
+    io.observe(bar);
+  }
+
   /* =========================================================================
      Boot
      ========================================================================= */
@@ -910,6 +932,7 @@
 
   function boot() {
     buildDom();
+    watchFabZones();
     applyMode(false);
 
     // restore the remembered open state

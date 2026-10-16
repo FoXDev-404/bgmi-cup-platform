@@ -429,7 +429,8 @@ input[type="datetime-local"] { color-scheme: dark; }
 
 /* verify + publish bar: sits in flow after the cards — never floats over
    the grid while data is entered; z keeps the actions reachable above the
-   drawer dim overlays */
+   standings drawer's dim overlays (the FLOW drawer/sheet deliberately sits
+   higher — body.af-flow-open demotes this bar, see admin-flow.css) */
 .bc-publish-bar {
   position: relative; z-index: 125; margin-top: 18px;
   background: rgba(12,13,16,.95); border: 1px solid var(--line);

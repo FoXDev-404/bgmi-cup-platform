@@ -11,7 +11,8 @@
      - #queue / #groups landings activate the matching tab and flash
      - LIVE chip + match-day-only phase expansion + tab dot while live
      - drawer / pin / icon rail / reload restore, desk STANDINGS tab never
-       overlaps, one drawer at a time, publish actions never covered
+       overlaps, one drawer at a time, the FLOW overlay always sits above
+       the publish bar / undo (no punch-through)
      - AUTO grid columns refuse pinning with a toast (fixed columns pin fine)
      - keyboard: Alt+W, Escape, focus traps; a11y labels + ordered lists
      - phone: floating button + bottom sheet
@@ -512,16 +513,38 @@ function check(name, ok, detail) {
   await page.waitForTimeout(500);
   const pubReach = await page.evaluate(() => {
     const btn = document.getElementById('publishBtn');
-    if (!btn) return 'no publish button';
+    if (!btn) return { where: 'no publish button' };
     btn.scrollIntoView({ block: 'center', behavior: 'instant' });
     const r = btn.getBoundingClientRect();
     const el = document.elementFromPoint(Math.round(r.left + r.width / 2),
       Math.round(r.top + r.height / 2));
-    return el && (el === btn || btn.contains(el)) ? true
-      : (el ? String(el.className) : 'null');
+    const flowEl = el && el.closest
+      ? el.closest('.af-back, .af-drawer, .af-sheet, .af-sheet-back') : null;
+    return {
+      open: window.AF._state().open,
+      where: flowEl ? 'flow overlay'
+        : (el === btn || btn.contains(el) ? 'publish button'
+          : String(el && el.className)),
+      barZ: getComputedStyle(document.querySelector('.bc-publish-bar')).zIndex,
+    };
   });
-  check('FLOW drawer never covers the verify/publish buttons', pubReach === true,
+  check('FLOW overlay sits above the verify/publish bar (no punch-through)',
+    pubReach.open === true && pubReach.where === 'flow overlay',
     JSON.stringify(pubReach));
+  const undoReach = await page.evaluate(() => {
+    const u = document.getElementById('floatUndo');
+    if (!u || u.hidden) return { hidden: true };
+    const r = u.getBoundingClientRect();
+    const el = document.elementFromPoint(Math.round(r.left + r.width / 2),
+      Math.round(r.top + r.height / 2));
+    const flowEl = el && el.closest
+      ? el.closest('.af-back, .af-drawer, .af-sheet, .af-sheet-back') : null;
+    return { covered: !!flowEl,
+      where: flowEl ? 'flow overlay' : String(el && el.className) };
+  });
+  check('FLOW overlay sits above the floating undo (no punch-through)',
+    undoReach.hidden === true || undoReach.covered === true,
+    JSON.stringify(undoReach));
 
   // AUTO columns: a pin that would drop the count is refused with a toast
   // (clear flow keys first: a stored rail only shifts the grid 76px and

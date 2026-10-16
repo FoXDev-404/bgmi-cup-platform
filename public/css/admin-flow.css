@@ -5,8 +5,10 @@
    (≥1280px) with an icon-rail collapse, and a phone bottom sheet (<1024px).
    z-index ladder (control.css): publish bar 125 · undo float 130 ·
    focus exit 140 · desk drawer 120 · this drawer/sheet 118 · backdrop 112 ·
-   tabs 104–105 · pinned column 60 — so FLOW never covers the publish bar
-   or the undo button.
+   tabs 104–105 · pinned column 60. While this overlay is open the desk's
+   floating actions drop to 90 (body.af-flow-open) so the panel is never
+   punched through, and the phone FAB fades while the publish bar is on
+   screen.
    =========================================================================== */
 
 .af-root, .af-root * { box-sizing: border-box; }
@@ -38,7 +40,16 @@
   border-radius: 999px; padding: 12px 16px; cursor: pointer;
   box-shadow: 3px 3px 0 rgba(0,0,0,.45);
   display: flex; align-items: center; gap: 8px;
+  transition: opacity .18s ease;
 }
+/* publish bar on screen (phone): the FAB steps aside instead of sitting
+   chopped under the verify/publish actions */
+.af-fab.af-fab-quiet { opacity: 0; visibility: hidden; pointer-events: none; }
+
+/* while the drawer/sheet is open the desk's floating actions go behind the
+   backdrop — closing FLOW brings them right back (pinned mode has none) */
+body.af-flow-open .bc-publish-bar,
+body.af-flow-open .bc-float-undo { z-index: 90; }
 
 /* ---- shared panel (nav) -------------------------------------------------- */
 .af-panel {
@@ -245,7 +256,8 @@ body.af-pinned.af-rail .af-utils { justify-content: center; }
 .af-skel span:nth-child(3) { width: 60%; }
 @keyframes afPulse { 50% { opacity: .45; } }
 
-/* phone spacing: FAB sits above the publish bar zone */
+/* phone: the tab hides — the FAB takes over and fades while the publish
+   bar is on screen (watchFabZones in admin-flow.js) */
 @media (max-width: 1023px) {
   .af-tab { display: none; }
 }
@@ -254,7 +266,7 @@ body.af-pinned.af-rail .af-utils { justify-content: center; }
   .af-sheet, .af-sheet-back { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .af-drawer, .af-sheet { transition: none; }
+  .af-fab, .af-drawer, .af-sheet { transition: none; }
   .af-skel span { animation: none; }
   .af-flash { animation: none; outline: 2px dashed var(--acid, #b6ff3e); outline-offset: 3px; }
 }

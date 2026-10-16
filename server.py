@@ -1469,6 +1469,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_themed_404()
         ext = os.path.splitext(full)[1].lower()
         ctype = CONTENT_TYPES.get(ext, "application/octet-stream")
+        # Images revalidate via ETag (mtime+size): after swapping a file in
+        # Explorer the browser picks up the new bytes on the next load
+        # instead of serving a stale copy from its heuristic cache.
+        is_image = ctype.startswith("image/")
+        etag = None
+        if is_image:
+            try:
+                st = os.stat(full)
+                etag = '"%x-%x"' % (st.st_mtime_ns, st.st_size)
+            except OSError:
+                etag = None
+            if etag and self.headers.get("If-None-Match") == etag:
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                return
         try:
             with open(full, "rb") as f:
                 body = f.read()
@@ -1484,8 +1501,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        if ext in (".html",):
+        if ext in (".html",) or is_image:
             self.send_header("Cache-Control", "no-cache")
+        if etag:
+            self.send_header("ETag", etag)
         self.end_headers()
         if not self._head_only:
             self.wfile.write(body)

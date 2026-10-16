@@ -1,109 +1,253 @@
 /* ==========================================================================
-   About — Fearless Esports (scoped .about-*, themed by css/style.css)
-   Round team frames use the site's accent glow (acid, rgba(182,255,62,.35))
+   About — "The faces behind the tags" (Fearless Esports)
+   Page-scoped look: black hero with a giant FEARLESS watermark, cream
+   who-we-are band, line-up cards with neon rings + red corner brackets.
+   Type: Archivo Black (display) · Rajdhani (labels/chips, self-hosted) ·
+         Inter/system (body copy) · Caveat (handwritten line).
    ========================================================================== */
 
-/* ---- intro --------------------------------------------------------------- */
-
-.about-intro {
-  padding: 120px 0 30px;
+:root {
+  --ab-red: #e8402c;          /* vivid — headlines, brackets, badges        */
+  --ab-red-mute: #b84c39;     /* small accents — kickers, chips, quote rule */
+  --ab-green: #cdee4d;        /* neon lime — rings, handwriting             */
+  --ab-cream: #f3f1ea;        /* who-we-are band                            */
+  --ab-display: 'Archivo Black', 'Arial Black', 'Anton', sans-serif;
+  --ab-label: 'Rajdhani', 'Segoe UI', sans-serif;
+  --ab-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-.about-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.22em;
+.ab-title-red { color: var(--ab-red); }
+
+/* ---- hero ---------------------------------------------------------------- */
+
+.ab-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 122px 0 142px;
+}
+
+/* giant cropped watermark behind the hero copy */
+.ab-wm {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.32em;
+  z-index: 0;
+  font-family: var(--ab-display);
+  font-size: 16.5vw;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  color: rgba(236, 231, 216, 0.055);
+  user-select: none;
+  pointer-events: none;
+}
+
+.ab-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.ab-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--ab-label);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: var(--acid);
-  margin-bottom: 12px;
+  line-height: 1.2;
+  padding: 7px 14px;
+  border: 1px solid;
 }
 
-.about-who {
-  max-width: 640px;
-  margin-top: 28px;
-  background: var(--paper);
-  color: #0c0d10;
-  border-radius: var(--radius-lg);
-  box-shadow: 6px 7px 0 rgba(0, 0, 0, 0.4);
-  padding: 22px 24px;
-}
+.ab-badge i { width: 9px; height: 9px; background: currentColor; display: block; flex: none; }
 
-.about-who-label {
-  font-family: var(--font-display);
-  font-size: 1.05rem;
+.ab-badge-red { color: var(--ab-red); border-color: rgba(232, 64, 44, 0.45); }
+.ab-badge-mute { color: rgba(236, 231, 216, 0.62); border-color: rgba(236, 231, 216, 0.18); }
+
+.ab-title {
+  font-family: var(--ab-display);
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 8px;
-}
-
-.about-who .tag-mini {
-  color: #8a3a30;                 /* readable accent on paper */
-  border-color: currentColor;
-  opacity: 1;
-  margin-left: 6px;
-}
-
-.about-who p {
-  font-family: var(--font-type);
-  font-size: 0.88rem;
-  line-height: 1.7;
-  margin: 0;
-}
-
-/* ---- team grid ----------------------------------------------------------- */
-
-.about-team {
-  padding: 26px 0 70px;
-}
-
-.about-team-heading {
-  font-family: var(--font-display);
-  font-size: clamp(1.4rem, 3.4vw, 2rem);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  margin: 18px 0 26px;
+  font-size: clamp(2.75rem, 6vw, 5.5rem);
+  line-height: 0.98;
+  letter-spacing: 0.005em;
   color: var(--ink);
+  position: relative;
+  z-index: 1;
 }
 
-.about-grid {
+.ab-title-line { display: block; }
+
+.ab-title-outline {
+  color: transparent;
+  -webkit-text-stroke: max(1.5px, 0.022em) #c9c9c9;
+}
+
+@supports not (-webkit-text-stroke: 1px #c9c9c9) {
+  .ab-title-outline { color: rgba(236, 231, 216, 0.42); }
+}
+
+.ab-lede {
+  margin-top: 24px;
+  max-width: 470px;
+  font-family: var(--ab-sans);
+  font-size: 1rem;
+  line-height: 1.62;
+  color: rgba(236, 231, 216, 0.6);
+  position: relative;
+  z-index: 1;
+}
+
+.ab-hand {
+  margin-top: 22px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.65rem;
+  line-height: 1.25;
+  color: var(--ab-green);
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- who we are ---------------------------------------------------------- */
+
+.ab-who {
+  background: var(--ab-cream);
+  color: #35322e;
+  padding: 72px 0 78px;
+}
+
+.ab-who-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.ab-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--ab-label);
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(236, 231, 216, 0.75);
+}
+
+.ab-kicker-dash { width: 30px; height: 2px; background: var(--ab-red); flex: none; }
+
+.ab-kicker-red { color: var(--ab-red-mute); }
+.ab-kicker-red .ab-kicker-dash { background: var(--ab-red-mute); }
+
+.ab-chip {
+  font-family: var(--ab-label);
+  font-weight: 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ab-red-mute);
+  border: 1px dashed rgba(184, 76, 57, 0.55);
+  padding: 4px 12px;
+}
+
+.ab-quote {
+  margin-top: 30px;
+  max-width: 690px;
+  border-left: 3px solid var(--ab-red-mute);
+  padding-left: 22px;
+}
+
+.ab-quote p {
+  font-family: var(--ab-sans);
+  font-size: 1.04rem;
+  line-height: 1.75;
+  color: #3c3936;
+}
+
+/* ---- the line-up --------------------------------------------------------- */
+
+.ab-lineup {
+  padding: 84px 0 92px;
+}
+
+.ab-lineup-title {
+  font-family: var(--ab-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(1.9rem, 4.2vw, 3.7rem);
+  line-height: 1;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+  margin: 16px 0 48px;
+}
+
+.ab-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
 }
 
-/* member card — same recipe as the site's cards:
-   paper-dark panel, hard offset shadow, straightened on hover */
-.about-card {
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.4);
-  padding: 28px 20px 22px;
-  text-align: center;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-.about-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.45);
-  z-index: 2;
-}
-
-/* round frame: accent ring outline + the site's glow */
-.about-frame {
+.ab-card {
   position: relative;
-  width: 132px;
-  height: 132px;
-  margin: 0 auto 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(236, 231, 216, 0.09);
+  padding: 32px 20px 30px;
+  text-align: center;
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+.ab-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(236, 231, 216, 0.2);
+}
+
+/* red corner brackets */
+.ab-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 0 solid var(--ab-red);
+  pointer-events: none;
+}
+
+.ab-corner-tl { top: -1px; left: -1px; border-top-width: 2px; border-left-width: 2px; }
+.ab-corner-tr { top: -1px; right: -1px; border-top-width: 2px; border-right-width: 2px; }
+.ab-corner-bl { bottom: -1px; left: -1px; border-bottom-width: 2px; border-left-width: 2px; }
+.ab-corner-br { bottom: -1px; right: -1px; border-bottom-width: 2px; border-right-width: 2px; }
+
+.ab-num {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  font-family: var(--ab-label);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  color: rgba(236, 231, 216, 0.42);
+}
+
+/* round frame: neon ring floating just outside the photo */
+.ab-frame {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 8px auto 20px;
   border-radius: 50%;
-  outline: 3px solid var(--acid);
+  outline: 3px solid var(--ab-green);
   outline-offset: 3px;
-  box-shadow: 0 0 30px rgba(182, 255, 62, 0.35);
-  background: var(--bg);
+  box-shadow: 0 0 26px rgba(205, 238, 77, 0.4);
+  background: var(--bg2);
   overflow: hidden;
 }
 
-.about-frame img {
+.ab-frame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -111,63 +255,66 @@
   display: block;
 }
 
-/* initials placeholder — same round frame, shown when a photo is missing */
-.about-initials {
+/* initials placeholder — shown when a photo is missing */
+.ab-initials {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
+  font-family: var(--ab-display);
   font-size: 2.4rem;
   letter-spacing: 0.04em;
-  color: var(--acid);
+  color: var(--ab-green);
   background:
-    radial-gradient(circle at 30% 25%, rgba(182, 255, 62, 0.14), transparent 60%),
+    radial-gradient(circle at 30% 25%, rgba(205, 238, 77, 0.14), transparent 60%),
     var(--bg);
 }
 
-.about-card img.failed { display: none; }
+.ab-card img.failed { display: none; }
 
-/* photo present (no .failed yet or loaded) -> keep the initials hidden;
-   only a failed load reveals them (img.failed stops matching, next sibling shows) */
-.about-frame img:not(.failed) + .about-initials { display: none; }
+/* photo present -> keep the initials hidden; only a failed load reveals them */
+.ab-frame img:not(.failed) + .ab-initials { display: none; }
 
-.about-name {
-  font-family: var(--font-display);
-  font-size: 1.45rem;
-  text-transform: uppercase;
+.ab-name {
+  font-family: var(--ab-label);
+  font-weight: 700;
+  font-size: 1.3rem;
   letter-spacing: 0.03em;
-  color: var(--ink);
-  margin: 0 0 8px;
-}
-
-/* role badge — the site's tag style, reused verbatim */
-.about-role {
-  display: inline-block;
-  font-family: var(--font-type);
-  font-size: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--acid);
-  border: 1px solid currentColor;
-  padding: 1px 7px;
-  opacity: 0.85;
+  color: var(--ink);
+  margin: 0 0 12px;
 }
 
-.about-noscript {
+.ab-role {
+  display: inline-block;
+  font-family: var(--ab-label);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ab-red-mute);
+  border: 1px solid rgba(184, 76, 57, 0.6);
+  background: rgba(232, 64, 44, 0.06);
+  padding: 5px 14px 4px;
+}
+
+.ab-noscript {
   font-family: var(--font-type);
   color: var(--beige-dim);
 }
 
 /* ---- responsive ---------------------------------------------------------- */
 
-@media (max-width: 820px) {
-  .about-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 860px) {
+  .ab-grid { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; }
 }
 
 @media (max-width: 520px) {
-  .about-intro { padding: 104px 0 20px; }
-  .about-grid { grid-template-columns: 1fr; gap: 18px; }
-  .about-frame { width: 116px; height: 116px; }
+  .ab-hero { padding: 106px 0 116px; }
+  .ab-who { padding: 58px 0 64px; }
+  .ab-lineup { padding: 64px 0 72px; }
+  .ab-frame { width: 126px; height: 126px; }
+  .ab-hand { font-size: 1.5rem; }
+  .ab-quote { padding-left: 16px; }
 }

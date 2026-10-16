@@ -9,10 +9,13 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Caveat:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+  <!-- self-hosted Rajdhani — labels/chips/names, shared with the overlays
+       so this page never waits on a second font CDN -->
+  <link rel="stylesheet" href="assets/fonts/overlay-fonts.css">
 
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/about.css?v=3">
+  <link rel="stylesheet" href="css/about.css?v=4">
   <link rel="stylesheet" href="css/footer.css?v=1">
 </head>
 <body>
@@ -41,14 +44,35 @@
   </nav>
   <div class="nav-overlay hidden" id="navOverlay"></div>
 
-  <!-- ========== INTRO ========== -->
-  <header class="about-intro" id="top">
+  <!-- ========== HERO — the faces behind the tags ========== -->
+  <header class="ab-hero" id="top">
+    <span class="ab-wm" aria-hidden="true">FEARLESS</span>
     <div class="container">
-      <div class="about-eyebrow">Fearless Esports &mdash; Greater Noida</div>
-      <h1 class="section-title">The faces<br><span class="crack">behind the tags.</span></h1>
+      <div class="ab-badges">
+        <span class="ab-badge ab-badge-red"><i aria-hidden="true"></i>Fearless Esports</span>
+        <span class="ab-badge ab-badge-mute"><i aria-hidden="true"></i>Greater Noida</span>
+      </div>
 
-      <div class="about-who">
-        <div class="about-who-label">Who we are <span class="tag-mini">placeholder</span></div>
+      <h1 class="ab-title">
+        <span class="ab-title-line">The faces</span>
+        <span class="ab-title-line ab-title-outline">Behind the</span>
+        <span class="ab-title-line ab-title-red">Tags.</span>
+      </h1>
+
+      <p class="ab-lede">Coach, IGL and assaulter &mdash; the three tags you will see in the lobby, and the hands behind this site.</p>
+      <p class="ab-hand">Devs by day, chickens by night.</p>
+    </div>
+  </header>
+
+  <!-- ========== WHO WE ARE ========== -->
+  <section class="ab-who" aria-label="Who we are">
+    <div class="container">
+      <div class="ab-who-head">
+        <p class="ab-kicker ab-kicker-red"><span class="ab-kicker-dash" aria-hidden="true"></span>Who we are</p>
+        <span class="ab-chip">Placeholder</span>
+      </div>
+
+      <blockquote class="ab-quote">
         <p>
           We are a Greater Noida BGMI squad that started as randoms in TDM and somehow
           became a team. We scrim every night, argue about rotations, and pretend the
@@ -57,19 +81,22 @@
           and what your in-game philosophy is. Keep it short, keep it honest, and
           maybe mention the chicken dinners.
         </p>
-      </div>
+      </blockquote>
     </div>
-  </header>
+  </section>
 
-  <!-- ========== TEAM ========== -->
-  <section class="about-team" aria-label="Team members">
+  <!-- ========== THE LINE-UP ========== -->
+  <section class="ab-lineup" aria-label="The line-up">
     <div class="container">
-      <div class="about-team-heading">The line-up</div>
-      <div class="about-grid" id="teamGrid">
+      <p class="ab-kicker"><span class="ab-kicker-dash" aria-hidden="true"></span>The line-up</p>
+
+      <h2 class="ab-lineup-title">Three tags. <span class="ab-title-red">One</span><br><span class="ab-title-red">Squad.</span></h2>
+
+      <div class="ab-grid" id="teamGrid">
         <!-- rendered from the TEAM config in js/about.js -->
       </div>
       <noscript>
-        <p class="about-noscript">Enable JavaScript to see the line-up &mdash; or find us in-game.</p>
+        <p class="ab-noscript">Enable JavaScript to see the line-up &mdash; or find us in-game.</p>
       </noscript>
     </div>
   </section>
@@ -129,6 +156,6 @@
     </div>
   </footer>
 
-  <script src="js/about.js?v=4"></script>
+  <script src="js/about.js?v=5"></script>
 </body>
 </html>

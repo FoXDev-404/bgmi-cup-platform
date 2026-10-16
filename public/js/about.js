@@ -37,15 +37,21 @@
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
-  function cardHtml(m) {
+  function cardHtml(m, i) {
     var ini = esc(initials(m.name));
-    return '<article class="about-card">' +
-      '<div class="about-frame">' +
-        '<img src="' + esc(photoSrc(m)) + '" alt="' + esc(m.name) + '" loading="lazy">' +
-        '<div class="about-initials" aria-hidden="true">' + ini + '</div>' +
+    var num = (i + 1 < 10 ? '0' : '') + (i + 1);
+    return '<article class="ab-card">' +
+      '<span class="ab-corner ab-corner-tl" aria-hidden="true"></span>' +
+      '<span class="ab-corner ab-corner-tr" aria-hidden="true"></span>' +
+      '<span class="ab-corner ab-corner-bl" aria-hidden="true"></span>' +
+      '<span class="ab-corner ab-corner-br" aria-hidden="true"></span>' +
+      '<span class="ab-num" aria-hidden="true">' + num + '</span>' +
+      '<div class="ab-frame">' +
+        '<img src="' + esc(photoSrc(m)) + '" alt="' + esc(m.name) + '">' +
+        '<div class="ab-initials" aria-hidden="true">' + ini + '</div>' +
       '</div>' +
-      '<h2 class="about-name">' + esc(m.name) + '</h2>' +
-      '<span class="about-role">' + esc(m.role) + '</span>' +
+      '<h2 class="ab-name">' + esc(m.name) + '</h2>' +
+      '<span class="ab-role">' + esc(m.role) + '</span>' +
       '</article>';
   }
 

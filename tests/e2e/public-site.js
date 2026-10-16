@@ -115,6 +115,117 @@ async function revealAll(page) {
       check(`${current} images render`, broken.length === 0,
         broken.slice(0, 3).join(','));
 
+      if (p === '/about') {
+        /* the line-up dossier: two cards, portraits, backdrop, copy, watermark */
+        const lineup = await page.evaluate(() => {
+          const grid = document.getElementById('teamGrid');
+          const sec = document.querySelector('.ab-lineup');
+          const imgs = [...document.querySelectorAll('#teamGrid img')];
+          return {
+            cards: grid ? grid.querySelectorAll('.ab-op').length : -1,
+            imgW: imgs.map((e) => e.naturalWidth),
+            text: grid ? grid.innerText : '',
+            section: sec ? sec.innerText : '',
+            bg: sec ? getComputedStyle(sec).backgroundImage : '',
+            watermarks: document.querySelectorAll('.ab-wm').length,
+          };
+        });
+        check(`${current} two operator cards`, lineup.cards === 2,
+          String(lineup.cards));
+        check(`${current} both portraits render`,
+          lineup.imgW.length === 2 && lineup.imgW.every((w) => w > 0),
+          lineup.imgW.join(','));
+        check(`${current} line-up names (removed member gone)`,
+          /FE_PSYCHO/.test(lineup.text) && /FE_KANNU/.test(lineup.text) &&
+          !/FE_SAHIL/.test(lineup.text));
+        check(`${current} dossier copy`,
+          /TWO NAMES/i.test(lineup.section) &&
+          /NO MERCY IN THE LAST CIRCLE/i.test(lineup.section) &&
+          /UNIT FILE 002/i.test(lineup.section) &&
+          /DROP TOGETHER\. SURVIVE TOGETHER/i.test(lineup.section),
+          lineup.section.replace(/\s+/g, ' ').slice(0, 80));
+        const bgUrl = (lineup.bg.match(/url\("?([^")]+)"?\)/) || [])[1];
+        const bgOk = bgUrl ? await page.evaluate((u) => new Promise((res) => {
+          const im = new Image();
+          im.onload = () => res(im.naturalWidth > 0);
+          im.onerror = () => res(false);
+          im.src = u;
+        }), bgUrl) : false;
+        check(`${current} battlefield backdrop loads`, bgOk === true,
+          (bgUrl || 'none').slice(0, 90));
+        check(`${current} FEARLESS watermark intact`, lineup.watermarks === 2,
+          String(lineup.watermarks));
+      }
+
+      if (p === '/') {
+        /* hero: crimson battlefield backdrop layer loads and covers */
+        const hero = await page.evaluate(() => {
+          const el = document.querySelector('.hero');
+          if (!el) return { bg: '', size: '' };
+          const cs = getComputedStyle(el);
+          return { bg: cs.backgroundImage, size: cs.backgroundSize };
+        });
+        const heroUrl = (hero.bg.match(/url\("?([^")]+)"?\)/) || [])[1];
+        const heroOk = heroUrl ? await page.evaluate((u) => new Promise((res) => {
+          const im = new Image();
+          im.onload = () => res(im.naturalWidth > 0);
+          im.onerror = () => res(false);
+          im.src = u;
+        }), heroUrl) : false;
+        check(`${current} hero battlefield backdrop loads`, heroOk === true,
+          (heroUrl || 'none').slice(0, 90));
+        check(`${current} hero backdrop covers viewport`, hero.size === 'cover',
+          hero.size);
+
+        /* hero reference recreation: title, copy, CTAs, countdown, stats, HUD */
+        const heroBits = await page.evaluate(() => {
+          const txt = (sel) => (document.querySelector(sel) || {}).textContent || '';
+          const pill = document.querySelector('.hero-cta .btn-primary');
+          const rules = document.querySelector('.hero-cta .btn-outline');
+          const rulesHref = rules ? rules.getAttribute('href') : '';
+          return {
+            eyebrow: txt('.hero-eyebrow'),
+            title: txt('.hero-title'),
+            date: txt('.hero-date'),
+            tagline: txt('.hero-tagline'),
+            labels: txt('.countdown-box'),
+            stats: txt('.hero-stats'),
+            register: pill ? pill.getAttribute('href') : '',
+            rules: rulesHref,
+            rulesTarget: !!document.querySelector(rulesHref || '#__missing'),
+            hud: txt('.hero-hud--tl') + txt('.hero-hud--bl') + txt('.hero-hud--br'),
+            cdLive: /^\d{1,3}$/.test(txt('#cd-days').trim()),
+          };
+        });
+        check(`${current} hero title lines`,
+          /BGMI CUP/.test(heroBits.title) && /NOIDA/.test(heroBits.title) &&
+          /2026/.test(heroBits.title) &&
+          /BATTLEGROUNDS MOBILE INDIA/.test(heroBits.eyebrow),
+          heroBits.title.replace(/\s+/g, ' ').trim().slice(0, 60));
+        check(`${current} hero date + tagline copy`,
+          /14 NOVEMBER/.test(heroBits.date) && /MMXXVI/.test(heroBits.date) &&
+          /Four squads\. One drop\. Zero mercy\./.test(heroBits.tagline) &&
+          /not your ego/.test(heroBits.tagline));
+        check(`${current} countdown units live`,
+          /DAYS/i.test(heroBits.labels) && /HOURS/i.test(heroBits.labels) &&
+          /MINUTES/i.test(heroBits.labels) && /SECONDS/i.test(heroBits.labels) &&
+          heroBits.cdLive,
+          heroBits.labels.replace(/\s+/g, ' ').trim().slice(0, 70));
+        check(`${current} hero CTAs wired`,
+          heroBits.register === '#register' && heroBits.rules === '#rules' &&
+          heroBits.rulesTarget,
+          `register=${heroBits.register} rules=${heroBits.rules}`);
+        check(`${current} stats strip values`,
+          /04/.test(heroBits.stats) && /TEAMS/i.test(heroBits.stats) &&
+          /06/.test(heroBits.stats) && /MATCHES/i.test(heroBits.stats) &&
+          /01/.test(heroBits.stats) && /CHAMPION/i.test(heroBits.stats));
+        check(`${current} hero HUD labels`,
+          /GREATER NOIDA/.test(heroBits.hud) &&
+          /LIVE THE BATTLE/.test(heroBits.hud) && /INDIA/.test(heroBits.hud) &&
+          /MORE THAN A TOURNAMENT/.test(heroBits.hud),
+          heroBits.hud.replace(/\s+/g, ' ').trim().slice(0, 70));
+      }
+
       await revealAll(page);
       // Rendered-but-unrevealed is the bug; elements inside display:none
       // panels (e.g. the post-submit confirmation card) are expected.

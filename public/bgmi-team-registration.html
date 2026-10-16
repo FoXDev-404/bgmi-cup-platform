@@ -9,9 +9,9 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;700&family=Permanent+Marker&family=Special+Elite&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=7">
   <link rel="stylesheet" href="css/bgmi-register.css?v=5">
   <link rel="stylesheet" href="css/footer.css?v=1">
 </head>
@@ -45,71 +45,133 @@
   <header class="hero sec-a" id="top">
     <div class="hero-scrim" aria-hidden="true"></div>
 
-    <div class="hero-float hero-float--a photocopy" style="--copy-src:url('/assets/images/sculptures/broken-head.png'); --shift-x:-2px; --shift-y:2px;" aria-hidden="true">
-      <img src="/assets/images/sculptures/broken-head.png" alt="">
+    <!-- map-style zone outlines + deco marks -->
+    <span class="hero-zone hero-zone--a" aria-hidden="true"></span>
+    <span class="hero-zone hero-zone--b" aria-hidden="true"></span>
+    <span class="hero-slashes hero-slashes--deco" aria-hidden="true">///</span>
+
+    <!-- HUD chrome -->
+    <div class="hero-hud hero-hud--tl" aria-hidden="true">
+      <div class="hero-callbox">
+        <span class="hb-line">GREATER NOIDA</span>
+        <span class="hb-line hb-dim">14 NOV 2026</span>
+        <span class="hb-line hb-dim">LIVE THE BATTLE</span>
+      </div>
+      <span class="hero-slashes">///</span>
     </div>
-    <div class="hero-float hero-float--b photocopy" style="--copy-src:url('/assets/images/sculptures/caesar.png'); --shift-x:3px; --shift-y:-2px;" aria-hidden="true">
-      <img src="/assets/images/sculptures/caesar.png" alt="">
+
+    <div class="hero-hud hero-hud--tr" aria-hidden="true">
+      <span class="hero-crosshair"></span>
+      <span class="hero-coords">28.5355&deg; N<br>77.3910&deg; E</span>
+    </div>
+
+    <div class="hero-hud hero-hud--left" aria-hidden="true">
+      <span class="hb-line">SQUAD</span>
+      <span class="hb-line">TACTICS</span>
+      <span class="hb-line">SURVIVAL</span>
+      <span class="hb-line">DOMINATION</span>
+      <span class="hero-slashes">///</span>
+    </div>
+
+    <div class="hero-hud hero-hud--right" aria-hidden="true">
+      <span class="hb-line">LAST ZONE</span>
+      <span class="hb-line">STRONGER</span>
+      <span class="hb-line">TOGETHER</span>
+      <span class="hero-slashes">///</span>
+    </div>
+
+    <div class="hero-hud hero-hud--bl" aria-hidden="true">
+      <span class="hero-hand">Greater Noida</span>
+      <span class="hero-india">INDIA</span>
+    </div>
+
+    <div class="hero-hud hero-hud--br" aria-hidden="true">
+      <span class="hero-br-tag"><i>//</i> BGM CUP.26</span>
+      <span class="hero-br-line">MORE THAN A TOURNAMENT</span>
     </div>
 
     <div class="hero-inner">
       <div class="hero-copy fade-in-up visible">
-        <div class="hero-stamp-row">
-          <span class="stamp stamp--acid">REGISTRATION OPEN</span>
-          <span class="stamp stamp--beige">SQUADS ONLY</span>
-        </div>
+        <p class="hero-eyebrow">
+          <span class="eb-mark" aria-hidden="true"><span class="hero-slashes">///</span><em></em></span>
+          BATTLEGROUNDS MOBILE INDIA
+          <span class="eb-mark" aria-hidden="true"><em></em><span class="hero-slashes">///</span></span>
+        </p>
 
         <h1 class="hero-title">
-          <span class="hero-title-line"><span class="glitch" data-ghost="BGMI CUP">BGMI CUP</span></span>
-          <span class="hero-title-line acid"><span class="glitch" data-ghost="NOIDA">NOIDA</span></span>
-          <span class="hero-title-line blood">2026</span>
-          <span class="hero-title-year">14 NOVEMBER MMXXVI</span>
+          <span class="hero-title-line hero-title-line--cream">BGMI CUP</span>
+          <span class="hero-title-line hero-title-line--acid">NOIDA</span>
+          <span class="hero-title-line hero-title-line--blood">2026</span>
+          <span class="hero-side-note">Same Map.<br>New <span class="hero-side-note-u">Legends.</span></span>
         </h1>
 
-        <p class="hero-tagline">Four seats. One drop. Zero rage quits.<br>Bring your squad, not your <b>smurf</b>.</p>
+        <p class="hero-date">14 NOVEMBER <b>MMXXVI</b></p>
+
+        <p class="hero-tagline">Four squads. One drop. Zero mercy.<br>Bring your squad, not your ego.</p>
 
         <div class="countdown-box">
           <div class="countdown-unit">
             <span class="countdown-number" id="cd-days">00</span>
-            <span class="countdown-label">days</span>
+            <span class="countdown-label">Days</span>
           </div>
           <span class="countdown-sep">:</span>
           <div class="countdown-unit">
             <span class="countdown-number" id="cd-hours">00</span>
-            <span class="countdown-label">hrs</span>
+            <span class="countdown-label">Hours</span>
           </div>
           <span class="countdown-sep">:</span>
           <div class="countdown-unit">
             <span class="countdown-number" id="cd-mins">00</span>
-            <span class="countdown-label">min</span>
+            <span class="countdown-label">Minutes</span>
           </div>
           <span class="countdown-sep">:</span>
           <div class="countdown-unit">
             <span class="countdown-number" id="cd-secs">00</span>
-            <span class="countdown-label">sec</span>
+            <span class="countdown-label">Seconds</span>
           </div>
         </div>
-
-        <p class="hero-meta">
-          <span class="k">VENUE&nbsp;</span> GALGOTIAS POLYTECHNIC, Knowledge Park II, GREATER NOIDA<br>
-          <span class="k">WHEN&nbsp;</span> 14 NOVEMBER 2026 &bull; LOBBY OPENS 4:00 PM IST<br>
-          <span class="k">SQUAD&nbsp;</span> 4 STARTERS + UP TO 2 SUBS &bull; ENTRY FREE
-        </p>
 
         <div class="hero-cta">
           <a class="btn-primary" href="#register">
             <span>Register your squad</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
           </a>
+          <a class="btn-outline" href="#rules">View rules</a>
         </div>
 
-        <p style="font-family:var(--font-type); font-size:.64rem; letter-spacing:.22em; text-transform:uppercase; color:var(--beige-dim);">
-          Presented by Cybersecured India &bull; MKITOS &bull; FoxFoster &mdash; same crew, louder lobby
-        </p>
+        <div class="hero-stats" role="list" aria-label="Event format">
+          <div class="hero-stat" role="listitem">
+            <svg class="hero-stat-icon" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true">
+              <circle cx="15" cy="6.4" r="3.4"/>
+              <path d="M8.4 19.4a6.6 6.6 0 0 1 13.2 0z"/>
+              <circle cx="5.1" cy="9.2" r="2.4"/>
+              <path d="M1.5 17.9a3.7 3.7 0 0 1 7.4 0z"/>
+              <circle cx="24.9" cy="9.2" r="2.4"/>
+              <path d="M21.1 17.9a3.7 3.7 0 0 1 7.4 0z"/>
+            </svg>
+            <span class="hero-stat-copy"><b>04</b><span>Teams</span></span>
+          </div>
+          <span class="hero-stat-slash" aria-hidden="true"></span>
+          <div class="hero-stat" role="listitem">
+            <svg class="hero-stat-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7.2 3h9.6v4.6a4.8 4.8 0 0 1-9.6 0V3z"/>
+              <path d="M6.4 4.4H3.2v1.3a3.6 3.6 0 0 0 3.7 3.6l.4-1.7A1.9 1.9 0 0 1 5.1 5.7V4.4z"/>
+              <path d="M17.6 4.4h3.2v1.3a3.6 3.6 0 0 1-3.7 3.6l-.4-1.7a1.9 1.9 0 0 0 2.2-1.9V4.4z"/>
+              <path d="M10.6 12.6h2.8l.4 4.2h-3.6z"/>
+              <path d="M7.4 19.2c0-1.3 1.9-2.4 4.6-2.4s4.6 1.1 4.6 2.4z"/>
+            </svg>
+            <span class="hero-stat-copy"><b>06</b><span>Matches</span></span>
+          </div>
+          <span class="hero-stat-slash" aria-hidden="true"></span>
+          <div class="hero-stat" role="listitem">
+            <svg class="hero-stat-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M12 2.4l7.6 3.1v5c0 4.8-3.2 8.2-7.6 9.7-4.4-1.5-7.6-4.9-7.6-9.7v-5L12 2.4zm0 4.4l-1.5 3-3.3.5 2.4 2.3-.6 3.3 3-1.6 3 1.6-.6-3.3 2.4-2.3-3.3-.5-1.5-3z"/>
+            </svg>
+            <span class="hero-stat-copy"><b>01</b><span>Champion</span></span>
+          </div>
+        </div>
       </div>
     </div>
-
-    <span class="type-write" style="position:absolute; right:6%; bottom:8%; z-index:2; font-size:.6rem; letter-spacing:.28em; text-transform:uppercase; color:rgba(200,182,144,.45); transform:rotate(2deg);">drop.incoming</span>
   </header>
 
   <!-- ========== THE META ========== -->

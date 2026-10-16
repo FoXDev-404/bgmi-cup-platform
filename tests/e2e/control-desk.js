@@ -270,10 +270,13 @@ function check(name, ok, detail) {
   }
   check('wipes fill 16th..13th in elimination order (AUTO)',
     JSON.stringify(placed) === '[16,15,14,13]', JSON.stringify(placed));
-  await page.waitForTimeout(900);
-  check('desk marks 4 wiped squads',
-    await page.locator('#squadGrid .bc-squad--dead').count() === 4,
-    await page.locator('#squadGrid .bc-squad--dead').count());
+  /* the desk repaints off the SSE/poll tick — wait for the 4th card to
+     flip, then count once (two reads can straddle a repaint and disagree) */
+  await page.waitForFunction(
+    () => document.querySelectorAll('#squadGrid .bc-squad--dead').length === 4,
+    null, { timeout: 8000 }).catch(() => {});
+  const deadCount = await page.locator('#squadGrid .bc-squad--dead').count();
+  check('desk marks 4 wiped squads', deadCount === 4, deadCount);
   const ranks = await page.locator('#squadGrid .bc-rank').allTextContents();
   check('deepest wipe owns 16th place on the desk', ranks.includes('#16'),
     ranks.join(','));

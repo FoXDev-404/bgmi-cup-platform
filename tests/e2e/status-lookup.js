@@ -205,13 +205,23 @@ function squad(tag, name, baseUid, phone, email) {
   console.log('  (sleeping 61s for a fresh window)');
   await sleep(61000);
   let limited = null;
-  for (let i = 1; i <= 7; i++) {
-    const r = await lookup(regA, '9811112222');
-    if (/Too many (lookups|attempts)/i.test(r.error)) { limited = r; break; }
+  for (let i = 1; i <= 8 && !limited; i++) {
+    /* await the actual POST response: under full-suite load the fixed
+       700 ms read inside lookup() can lag a 429 by more than one try */
+    const [resp] = await Promise.all([
+      page.waitForResponse((r) => /\/api\/status\/lookup/.test(r.url()) &&
+        r.request().method() === 'POST', { timeout: 5000 }).catch(() => null),
+      lookup(regA, '9811112222'),
+    ]);
+    if (resp && resp.status() === 429) {
+      limited = { status: 429,
+        error: (await page.textContent('#lookupError')).trim(),
+        visible: await page.locator('#result').isVisible() };
+    }
   }
   check('6th lookup in a minute returns the rate-limit message',
-    !!limited && !limited.visible,
-    limited ? limited.error : 'never limited within 7 tries');
+    !!limited && !limited.visible && /Too many/i.test(limited.error),
+    limited ? JSON.stringify(limited) : 'never limited within 8 tries');
 
   check('no console/page errors', errs.length === 0,
     errs.slice(0, 2).join(' | '));

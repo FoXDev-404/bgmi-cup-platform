@@ -428,13 +428,25 @@ def main():
     j("POST", "/api/admin/matches/%d/checkin" % mid,
       {"teamIds": squad_ids}, headers=T.ah())
 
+    st, d = j("GET", "/api/admin/matches/%d" % mid, headers=T.ah())
+    preview = d["state"]["teams"] if st == 200 else []
+    report("upcoming cards preview the 4 registered starters",
+           st == 200 and len(preview) == len(squad_ids)
+           and all(len(t["players"]) == 4 for t in preview),
+           str([len(t["players"]) for t in preview]))
+    report("preview rows are read-only (no player ids yet)",
+           all(p["id"] is None for t in preview for p in t["players"])
+           and all(p["name"] and p["uid"] for t in preview
+                   for p in t["players"]),
+           str(preview[0]["players"][:1])[:160] if preview else "no teams")
+
     st, d = j("POST", "/api/admin/matches/%d/status" % mid,
               {"status": "live"}, headers=T.ah())
     report("start match goes live", st == 200
            and d["state"]["match"]["status"] == "live", str(d)[:160])
     report("start creates player rows for every squad",
-           all(t.get("players") for t in d["state"]["teams"]),
-           str(d)[:200])
+           all(t.get("players") and all(p["id"] for p in t["players"])
+               for t in d["state"]["teams"]), str(d)[:200])
     # double-start refused
     st, _ = j("POST", "/api/admin/matches/%d/status" % mid,
               {"status": "live"}, headers=T.ah())

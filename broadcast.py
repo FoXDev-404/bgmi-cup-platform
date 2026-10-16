@@ -1192,6 +1192,17 @@ def match_state(conn, match_id):
                 knocked += 1
             else:
                 out += 1
+        if not players and match["status"] == "upcoming":
+            # roster preview before kick-off: the 4 registered starters stay
+            # visible (read-only) on every card so squads can be eyeballed
+            # without starting the match; no player_stats rows exist yet
+            players = [{"id": None, "name": row["ign"], "uid": row["uid"],
+                        "kills": 0, "damage": 0, "status": "alive"}
+                       for row in conn.execute(
+                           "SELECT ign, uid FROM roster_members WHERE team_id = ? "
+                           "AND UPPER(COALESCE(slot, '')) NOT LIKE 'S%' "
+                           "AND LOWER(COALESCE(role, '')) NOT LIKE 'sub%' "
+                           "ORDER BY slot LIMIT 4", (r["team_id"],))]
         if alive or knocked:
             alive_total += 1
         teams.append(dict(pub, slot=slot, kills=r["kills"],

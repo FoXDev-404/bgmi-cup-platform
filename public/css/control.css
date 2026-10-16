@@ -350,6 +350,13 @@ input[type="datetime-local"] { color-scheme: dark; }
 }
 .bc-player--out .bc-pid b { text-decoration: line-through; opacity: .55; }
 .bc-player--knocked .bc-pid b { color: #f2c14e; }
+.bc-player--roster { opacity: .85; }
+.bc-player--roster .bc-pid { flex: 1 1 auto; }
+.bc-roster-chip {
+  margin-left: auto; font-size: .54rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--beige-dim);
+  border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px;
+}
 .bc-dmg {
   width: 48px; padding: 3px 2px; text-align: center; border: 0;
   border-left: 1px solid var(--line) !important; border-right: 1px solid var(--line) !important;

@@ -318,7 +318,10 @@
   }
 
   function squadCard(t, total) {
-    var dead = t.players.length > 0 && t.alive === 0 && t.knocked === 0;
+    var editable = state.match.status === 'live' ||
+      state.match.status === 'awaiting_verification';
+    var dead = editable && t.players.length > 0 && t.alive === 0 &&
+      t.knocked === 0;
     var isFolded = !!folded[t.teamId];
     var flagged = Date.now() < (conflicts[t.teamId] || 0);
     var logo = t.logo && String(t.logo).indexOf('/uploads/') === 0
@@ -332,6 +335,16 @@
         '">' + (t.adjustment > 0 ? '+' : '') + t.adjustment + '</span>' : '';
 
     var players = t.players.map(function (p, i) {
+      if (!editable) {
+        /* pre-match roster preview: names + UIDs only, no live controls */
+        return '<div class="bc-player bc-player--roster" ' +
+          'title="Registered starter — the match has not started">' +
+          '<span class="bc-pidx">' + (i + 1) + '</span>' +
+          '<span class="bc-pid"><b title="' + esc(p.name) + ' — UID ' +
+          esc(p.uid) + '">' + esc(p.name) + '</b>' +
+          '<small>UID ' + esc(p.uid) + '</small></span>' +
+          '<span class="bc-roster-chip">roster</span></div>';
+      }
       var btns = STATUS_BTNS.map(function (b) {
         return '<button type="button" class="bc-st ' + b[2] +
           '" data-ps="' + p.id + '" data-field="status" data-value="' + b[0] +
@@ -442,7 +455,8 @@
       teams = teams.filter(function (t) { return (t.alive + t.knocked) > 0; });
     } else if (filter === 'dead') {
       teams = teams.filter(function (t) {
-        return t.players.length > 0 && t.alive === 0 && t.knocked === 0;
+        return m.status !== 'upcoming' && t.players.length > 0 &&
+          t.alive === 0 && t.knocked === 0;
       });
     }
     if (searchQ) {

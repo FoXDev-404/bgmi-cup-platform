@@ -347,6 +347,26 @@ function check(name, ok, detail) {
       new URL(page.url()).pathname === '/admin/control', page.url());
   } catch (e) { check('desk opens with Match 1 selected', false, page.url()); }
 
+  /* upcoming: cards preview the registered roster before kick-off */
+  try {
+    await page.waitForSelector('#squadGrid .bc-squad .bc-player--roster',
+      { timeout: 8000 });
+  } catch (e) { /* the check below reports the miss */ }
+  const preview = await page.evaluate(() => {
+    const card = document.querySelector('#squadGrid .bc-squad');
+    if (!card) return 'no card';
+    const rows = [...card.querySelectorAll('.bc-player--roster')];
+    return { rows: rows.length,
+      named: rows.filter((r) => {
+        const b = r.querySelector('.bc-pid b');
+        return !!b && b.textContent.trim().length > 0;
+      }).length,
+      liveControls: card.querySelectorAll('.bc-dmg, .bc-kcount, .bc-st').length };
+  });
+  check('upcoming cards preview the 4 starters (read-only)',
+    preview.rows === 4 && preview.named === 4 && preview.liveControls === 0,
+    JSON.stringify(preview));
+
   /* ---------- live -> verify/publish ---------- */
   console.log('\n[live flow]');
   const st1 = await POST(`/api/admin/matches/${mid}/status`, { status: 'live' }, H);

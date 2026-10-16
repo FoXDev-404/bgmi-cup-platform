@@ -1,7 +1,7 @@
 {
-  "name": "new_floder",
+  "name": "bgmi-cup-platform",
   "version": "1.0.0",
-  "description": "Competitive BGMI squad-registration page matching the CyberSec India theme, backed by a dependency-free Python server with SQLite persistence.",
+  "description": "BGMI CUP tournament platform — squad registration, admin control room, live scoring desk and OBS overlays per edition. Python stdlib + SQLite, zero dependencies.",
   "main": "index.js",
   "scripts": {},
   "keywords": [],

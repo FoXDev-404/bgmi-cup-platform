@@ -108,6 +108,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const sttb = await registerTeam(squad('Round Two Squad', 'RNDB', '606102001',
     '9833334444', 'rndb@demo.invalid', 'RNDBCAP'));
   check('fixture squads registered', !!(stta && sttb), JSON.stringify([stta, sttb]));
+  /* the seeded demo already fills the default 32 slots - make room first */
+  const setLim = await POST('/api/admin/settings', { slot_limit: 40 },
+    { 'X-Admin-CSRF': csrf });
+  check('slot limit raised for the fixture squads', setLim.s === 200, setLim.s);
   check('fixtures approved', (await setStatus(stta.id, 'approved')).s === 200 &&
     (await setStatus(sttb.id, 'approved')).s === 200);
 

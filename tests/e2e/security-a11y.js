@@ -242,6 +242,19 @@ function raw(method, pathAndQuery) {
 
   /* ---------- dialogs: Escape closes the desk swap dialog ---------- */
   console.log('\n[dialog keyboard]');
+  /* the desk dialog checks need a live match - start the seeded lobby */
+  const schedA = (((await GET('/api/admin/matches')).d.matches) || [])
+    .find((m) => m.status === 'upcoming');
+  const grpOfA = (r) => r.group_name || r.group || '';
+  const gAteams = (((await GET('/api/admin/registrations?status=approved')).d
+    .registrations) || []).filter((r) => grpOfA(r) === 'Group A')
+    .map((r) => r.team_id).slice(0, 16);
+  const chkInA = await POST('/api/admin/matches/' + schedA.id + '/checkin',
+    { teamIds: gAteams }, H);
+  const liveA = await POST('/api/admin/matches/' + schedA.id + '/status',
+    { status: 'live' }, H);
+  check('live fixture: seeded Group A lobby started',
+    chkInA.s === 200 && liveA.s === 200, chkInA.s + '/' + liveA.s);
   await page.goto(BASE + '/admin/control', { waitUntil: 'load' });
   await page.waitForSelector('#squadGrid .bc-squad', { timeout: 10000 });
   const liveM = ((await GET('/api/admin/matches')).d.matches || [])

@@ -3,10 +3,13 @@
 ```powershell
 python tests/test_api.py           # 104 checks
 python tests/test_admin.py         # 96 checks (waits 61s once for the public lookup bucket)
+python tests/test_broadcast.py     # 139 checks (scoring engine, desk, overlays, purge)
+python tests/test_flow.py          # admin FLOW workflow-status endpoint + status logic
+python tests/test_seed.py          # 41 checks (seed rails, scenarios, backups, env)
 npx playwright test                # browser specs (tests/, Chromium; run `npm install` once)
 ```
 
-One command runs all of the above plus the nine end-to-end stage scripts in
+One command runs all of the above plus the eleven end-to-end stage scripts in
 `tests/e2e/` (each against a freshly seeded throw-away DB): `scripts\verify.bat`
 on Windows, `scripts/verify.sh` in bash. Full details and results:
 `docs/verification-report.md`.
@@ -40,7 +43,21 @@ purge guard, **dashboard extras** (`remaining`, notify counts),
 **auto-distribute preview (writes nothing) → apply → preserve-on-re-run**,
 **same-origin rejection (Origin/Referer 403)**, **session idle + absolute
 expiry**, **login throttling (per-account 429, identical 401 bodies)**, and a
-teardown that returns the DB to its pre-test state.
+teardown that returns the DB to its pre-test state. Its fixtures come from the
+demo seed's library API (32 squads in the `mixed` scenario) plus its own
+registrations.
+
+`tests/test_broadcast.py` covers: migrations, the scoring engine + tie-breakers,
+admin gating, published standings and live state (PII-free), overlay tokens and
+SSE fan-out, the full match lifecycle, desk actions (kills, placements,
+adjustments, swaps, undo), publish rules, CSV exports and the purge.
+
+`tests/test_flow.py` covers the admin FLOW workflow-status endpoint (auth gate,
+counts/statuses/labels only, demo flag) and the pure status logic.
+`tests/test_seed.py` runs `scripts/seed_demo.py` as a subprocess against
+private temp databases: fresh seed, re-run, `--with-results`, the `mixed`
+scenario, the safety rails (stop on real-looking rows, typed confirmation),
+backup/restore and the `BGMI_DB_PATH` override.
 
 Playwright specs (`tests/*.spec.js`) drive Chromium against a self-spawned
 server: the registration review-step flow, plus a link/asset check that walks

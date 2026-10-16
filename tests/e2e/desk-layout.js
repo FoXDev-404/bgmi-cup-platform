@@ -65,7 +65,7 @@ function check(name, ok, detail) {
   const csrf = me.d && me.d.csrf;
   const H = { 'X-Admin-CSRF': csrf };
   check('session + csrf available', me.s === 200 && !!csrf, me.s);
-  const setLim = await POST('/api/admin/settings', { slot_limit: 32 }, H);
+  const setLim = await POST('/api/admin/settings', { slot_limit: 48 }, H);
   check('slot limit raised for the fixture lobby', setLim.s === 200,
     setLim.s + ' ' + ((setLim.d || {}).error || ''));
 

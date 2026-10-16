@@ -94,7 +94,7 @@ without `--overwrite`. Both scripts print row counts only — no PII.
 | `public/assets/vendor/` | qrcode + jsPDF (for squad-pass PDF/QR) |
 | `public/images/team/` | Team photos read by the About page (`fe_psycho.png` etc.) |
 | `scripts/create_admin.py` | Create/rotate an admin account (scrypt-hashed) |
-| `scripts/seed_demo.py` | Optional ~20 demo registrations + groups for UI rehearsal |
+| `scripts/seed_demo.py` | Backup-first demo reseed: 32 anime squads 16/16 in Group A+B, one scheduled match per group, DEMO DATA badge |
 | `scripts/backup_db.py` | Consistent online backup of `registrations.db` (integrity-checked) |
 | `scripts/restore_db.py` | Restore a backup (temp file + atomic replace, `--overwrite` guard) |
 | `tests/test_api.py` | End-to-end API suite (104 checks, self-hosted + isolated by default) |

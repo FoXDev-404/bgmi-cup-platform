@@ -7,7 +7,7 @@ rem    1. python tests\test_api.py / test_admin.py / test_broadcast.py /
 rem       test_flow.py / test_seed.py
 rem       (each hosts its own throw-away server + DB)
 rem    2. npx playwright test            (specs host their own server + DB)
-rem    3. the ten stage scripts in tests\e2e\, each against a freshly seeded
+rem    3. the eleven stage scripts in tests\e2e\, each against a freshly seeded
 rem       throw-away DB on http://127.0.0.1:8090
 rem
 rem  Nothing here touches data\registrations.db, .env or the live 8080 demo

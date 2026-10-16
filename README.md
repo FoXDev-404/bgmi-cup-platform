@@ -126,6 +126,9 @@ worth confirming against your event's rulebook). Exports:
 ```powershell
 python tests/test_api.py            # registration/public API suite
 python tests/test_admin.py          # admin workflow suite (includes one 61s wait)
+python tests/test_broadcast.py      # scoring engine + desk/overlay suite
+python tests/test_flow.py           # admin FLOW workflow-status endpoint
+python tests/test_seed.py           # demo-seed safety rails and scenarios
 npx playwright test                 # browser specs (run `npm install` once first)
 ```
 
@@ -136,13 +139,25 @@ Coverage details: [docs/testing.md](docs/testing.md).
 ## Seed demo data
 
 ```powershell
-python scripts/seed_demo.py           # 20 demo squads + groups + 2 demo matches
-                                      # (one published, one live) + overlay settings
-python scripts/seed_demo.py --clean   # remove everything demo
+python scripts/seed_demo.py                    # 32 demo squads (16/16 in Group A+B) +
+                                               # one scheduled match per group
+python scripts/seed_demo.py --scenario mixed   # 20 approved + the other statuses in play
+python scripts/seed_demo.py --with-results     # also play + publish one group opener
+python scripts/seed_demo.py --db <path>        # alternate DB (else BGMI_DB_PATH / BGMI_DB)
+python scripts/seed_demo.py --reset --yes      # wipe + reseed even if rows look real
 ```
 
-Demo rows are identifiable: team ids `CSM-BG-Dxxx`, codes `BGMI26-9xxx`,
-emails `@demo.invalid`, match notes `Demo match …`.
+The seed is safe to re-run: before anything is touched the database and uploads
+are archived to a verified zip at `<db-dir>/backups/pre-reset-YYYYMMDD-HHMM.db`,
+and if it finds rows that do not look like demo data (emails must end in
+`@example.com` or the legacy `@demo.invalid`) a plain run stops without
+changing anything — `--reset` is required and asks for a typed `RESET` unless
+`--yes` is given. The 32 squads are inserted through the real registration path
+(validated fields, generated roster and logo tiles), approved, split 16/16 into
+Group A and Group B, and each group gets one scheduled match. Settings and
+scoring rules are restored to their defaults except the slot limit (32); the
+overlay token is rotated. `settings.demo_seed` lights the **DEMO DATA** badge in
+the admin UI until a purge removes it.
 
 ## Environment variables
 

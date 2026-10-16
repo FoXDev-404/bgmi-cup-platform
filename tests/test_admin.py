@@ -15,6 +15,7 @@ deleted at the end — no default credentials anywhere).
 
 import json
 import os
+import sqlite3
 import sys
 import time
 
@@ -22,6 +23,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import test_api as T          # noqa: E402  (shared HTTP + fixture helpers)
+import broadcast              # noqa: E402  (temp DB env comes from test_api)
+import server                 # noqa: E402
 import scripts.seed_demo as seed_demo   # noqa: E402
 
 sys.path.insert(0, os.path.join(T.ROOT, "scripts"))
@@ -58,7 +61,7 @@ def main():
     print("== BGMI approval-workflow tests @ %s ==" % T.BASE)
 
     # drop leftovers from any crashed run BEFORE capturing the baseline
-    seed_demo.main(clean=True)
+    seed_demo.reset(server, broadcast, "mixed")
     baseline_teams = T.jhttp("GET", "/api/health")[1].get("count", -1)
 
     # ---------- pages ----------
@@ -70,12 +73,12 @@ def main():
     st, data = T.jhttp("GET", "/api/public/approved")
     report("public feed hidden while disabled", st == 404)
 
-    # ---------- seed demo data (direct SQL, no HTTP) ----------
+    # ---------- seed demo data (direct SQL via the seed's library API) ----------
     print("\n[seed]")
-    rc = seed_demo.main(clean=False)
-    report("demo data seeded", rc == 0)
+    info = seed_demo.seed(server, broadcast, "mixed")
+    report("demo data seeded", len(info["team_ids"]) == 32)
     st, b = T.jhttp("GET", "/api/health")
-    report("health reflects seeded count", b.get("count", -1) - baseline_teams == 20,
+    report("health reflects seeded count", b.get("count", -1) - baseline_teams == 32,
            "count=%s baseline=%s" % (b.get("count"), baseline_teams))
 
     # ---------- register one fresh team (rate budget: 1 call) ----------
@@ -144,14 +147,29 @@ def main():
 
     # ---------- queue ----------
     print("\n[queue]")
+    # a duplicate-phone partner row (direct SQL) gives the queue's conflict
+    # flag something to report - the seeded demo data is duplicate-free
+    conn2 = sqlite3.connect(T.DB_PATH, timeout=5)
+    try:
+        conn2.execute(
+            "INSERT INTO registrations (team_id, team_name, team_tag, "
+            "guild_name, cap_ign, cap_uid, cap_email, cap_phone, cap_discord, "
+            "ip, created_at, reg_code, status) VALUES ('CSM-BG-CFLT', "
+            "'E2E Conflict Partner', 'CFLT', 'Guild C', 'CapCFLT', "
+            "'606004999', 'cflt@demo.invalid', ?, '', '127.0.0.1', "
+            "'2026-01-01T00:00:00+00:00', 'BGMI26-9001', 'pending')",
+            (p["capPhone"],))
+        conn2.commit()
+    finally:
+        conn2.close()
     st, d = j("GET", "/api/admin/registrations", headers=T.ah())
     report("queue loads with session", st == 200 and
-           len(d["registrations"]) == baseline_teams + 21,
+           len(d["registrations"]) == baseline_teams + 34,
            "n=%s" % len(d.get("registrations", [])))
     counts = d.get("counts", {})
     report("counts per status present",
            set(counts) >= {"pending", "approved", "rejected", "waitlisted", "needs_changes"})
-    report("slot limit reported", d.get("slot_limit") == 16, str(d.get("slot_limit")))
+    report("slot limit reported", d.get("slot_limit") == 32, str(d.get("slot_limit")))
     ours = [r for r in d["registrations"] if r["team_id"] == tid]
     report("our team visible + pending",
            ours and ours[0]["status"] == "pending")
@@ -183,7 +201,7 @@ def main():
     report("short uid edit rejected", st == 400 and d.get("field") == "capUid",
            "status=%s body=%s" % (st, d))
     st, d = j("PUT", "/api/admin/registrations/" + tid,
-              {"teamTag": "PXRA"}, headers=T.ah())
+              {"teamTag": "HLEF"}, headers=T.ah())
     report("duplicate tag edit rejected", st in (400, 409),
            "status=%s body=%s" % (st, d))
     st, d = j("PUT", "/api/admin/registrations/" + tid,
@@ -229,7 +247,7 @@ def main():
     report("status note stored",
            d["registration"].get("status_note") == "Slot confirmed - group posted")
 
-    # pending demo team id (seed order: 8 approved then pending)
+    # pending demo team id (seed order: the approved block comes first)
     st, d = j("GET", "/api/admin/registrations?status=pending", headers=T.ah())
     pend = [r["team_id"] for r in d["registrations"] if r["team_id"] != tid]
     st, d = j("GET", "/api/admin/settings", headers=T.ah())
@@ -246,7 +264,7 @@ def main():
               {"status": "approved", "override": True}, headers=T.ah())
     report("override approves past the limit", st == 200,
            "status=%s body=%s" % (st, d))
-    j("POST", "/api/admin/settings", {"slot_limit": 16}, headers=T.ah())
+    j("POST", "/api/admin/settings", {"slot_limit": 32}, headers=T.ah())
     report("slot limit restored", True)
 
     st, d = j("POST", "/api/admin/registrations/%s/status" % pend[1],
@@ -626,9 +644,9 @@ def main():
     print("\n[teardown]")
     j("DELETE", "/api/admin/registrations/" + tid, headers=T.ah())
     j("POST", "/api/admin/settings",
-      {"slot_limit": 16, "public_teams": False, "groups_locked": False},
+      {"slot_limit": 32, "public_teams": False, "groups_locked": False},
       headers=T.ah())
-    seed_demo.main(clean=True)
+    seed_demo.reset(server, broadcast, "mixed")
     T.jhttp("POST", "/api/admin/logout", headers=T.ah(), raw=b"{}",
             ctype="application/json")
     T.drop_fixture()

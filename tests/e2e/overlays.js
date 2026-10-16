@@ -117,7 +117,7 @@ async function waitFor(fn, ms) {
   console.log('\n[token gate]');
   const noTok = await GET('/api/overlay/state/live');
   const junkTok = await GET('/api/overlay/state/live?token=nope');
-  check('missing/junk token -> 403 (seed token starts empty)',
+  check('missing/junk token -> 403',
     noTok.s === 403 && junkTok.s === 403,
     noTok.s + '/' + junkTok.s);
   const rot1 = await POST('/api/admin/overlay-settings', { rotateToken: true }, H);
@@ -152,6 +152,21 @@ async function waitFor(fn, ms) {
   check('disabled flag round-trips per scene',
     dis.s === 200 && disState.d.disabled === true && enState.d.disabled === false,
     JSON.stringify([disState.d.disabled, enState.d.disabled]));
+
+  /* ---------- live-match fixture (the desk cross-check needs a live match) -- */
+  const sched = (((await GET('/api/admin/matches')).d.matches) || [])
+    .find((m) => m.status === 'upcoming');
+  const grpOf = (r) => r.group_name || r.group || '';
+  const gA = (((await GET('/api/admin/registrations?status=approved')).d
+    .registrations) || []).filter((r) => grpOf(r) === 'Group A')
+    .map((r) => r.team_id).slice(0, 16);
+  const chkIn = await POST('/api/admin/matches/' + sched.id + '/checkin',
+    { teamIds: gA }, H);
+  const live0 = await POST('/api/admin/matches/' + sched.id + '/status',
+    { status: 'live' }, H);
+  check('live fixture: seeded Group A lobby started',
+    chkIn.s === 200 && live0.s === 200 && live0.d.state.match.status === 'live',
+    chkIn.s + '/' + live0.s);
 
   /* ---------- PII sweep ---------- */
   console.log('\n[PII sweep]');

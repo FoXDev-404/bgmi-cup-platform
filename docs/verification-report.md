@@ -119,8 +119,9 @@ UTF-8 BOM for Excel). Those are listed under observations where notable.
   admin UI always sends kill + all 8 placements + tie-breakers). A hand-rolled
   partial payload resets the omitted values to zero — an API robustness
   footnote, not reachable from the UI.
-- **A fresh seed leaves the overlay token empty** (secure default): overlay
-  endpoints answer 403 until an admin rotates/sets a token on /admin/overlays.
+- **A fresh seed rotates the overlay token** (the previous value stops
+  working): overlay endpoints answer 403 without the current token, which is
+  readable on `/admin/overlays`; a purge issues a fresh one.
 - **The landing page is the registration form**, so its "Register team"
   buttons are in-page `#register` anchors; other pages link across. The footer
   CTA and sitemap both include "Register team" by design.

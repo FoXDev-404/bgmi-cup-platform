@@ -3,10 +3,11 @@
 #  One-command verification for the BGMI project (bash; git-bash on Windows).
 #
 #  Runs, in order:
-#    1. python tests/test_api.py / test_admin.py / test_broadcast.py
+#    1. python tests/test_api.py / test_admin.py / test_broadcast.py /
+#       test_flow.py / test_seed.py
 #       (each hosts its own throw-away server + DB)
 #    2. npx playwright test            (specs host their own server + DB)
-#    3. the ten stage scripts in tests/e2e/, each against a freshly seeded
+#    3. the eleven stage scripts in tests/e2e/, each against a freshly seeded
 #       throw-away DB on http://127.0.0.1:8090
 #
 #  Nothing here touches data/registrations.db, .env or the live 8080 demo
@@ -67,6 +68,8 @@ echo "==== python suites ===="
 python tests/test_api.py || FAILED="$FAILED test_api"
 python tests/test_admin.py || FAILED="$FAILED test_admin"
 python tests/test_broadcast.py || FAILED="$FAILED test_broadcast"
+python tests/test_flow.py || FAILED="$FAILED test_flow"
+python tests/test_seed.py || FAILED="$FAILED test_seed"
 
 echo "==== playwright specs ===="
 npx playwright test --reporter=line || FAILED="$FAILED playwright"
@@ -81,8 +84,8 @@ export VERIFY_ADMIN_USER=verifyadmin
 export VERIFY_ADMIN_PASSWORD=verify-pass-2026
 
 for S in public-site registration-flows status-lookup admin-flows \
-         matches-flows control-desk desk-layout scoring-check overlays \
-         security-a11y; do
+         matches-flows control-desk desk-layout flow-sidebar scoring-check \
+         overlays security-a11y; do
   if ! reset_env; then exit 1; fi
   echo "==== stage $S ===="
   node "tests/e2e/$S.js" "$BASE" || FAILED="$FAILED $S"

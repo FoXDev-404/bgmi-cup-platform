@@ -180,6 +180,9 @@ function parseCsv(text) {
       { slot: 'P4', role: 'Starter', ign: tag + 'P4', uid: String(Number(capUid) + 3) },
     ]),
   });
+  /* the seeded demo fills the default 32 slots - make room for the fixtures */
+  const setLim = await POST('/api/admin/settings', { slot_limit: 40 }, H);
+  check('slot limit raised for the fixture squads', setLim.s === 200, setLim.s);
   const byTag = {};
   let allMounted = true;
   for (let i = 0; i < TAGS.length; i++) {

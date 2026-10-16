@@ -80,6 +80,10 @@ function check(name, ok, detail) {
   const queue = async (qs) => (await GET('/api/admin/registrations' + (qs || ''))).d;
   const setStatus = (tid, status) => POST(
     `/api/admin/registrations/${tid}/status`, { status, note: '' }, H);
+  /* the seeded demo already fills the default 32 slots; make room for the
+   * two fixture squads before approving anything */
+  const setLim = await POST('/api/admin/settings', { slot_limit: 40 }, H);
+  check('slot limit raised for the fixture squads', setLim.s === 200, setLim.s);
   const registerTeam = async (form) => {
     const t = await api.get(BASE + '/api/csrf').then(js);
     const r = await api.post(BASE + '/api/register', {
@@ -117,7 +121,7 @@ function check(name, ok, detail) {
     const res = await setStatus(row.team_id, 'approved');
     if (res.s === 200) approvedCount += 1;
   }
-  check('16 approved squads ready', approvedCount === 16, approvedCount);
+  check('16 approved squads ready', approvedCount >= 16, approvedCount);
 
   const groupsAll = ((await GET('/api/admin/matches')).d.groups) || [];
   let g16 = groupsAll.find((g) => g.name === 'E2E Sixteen');
@@ -127,7 +131,10 @@ function check(name, ok, detail) {
     g16 = { id: g.d.groupId, name: 'E2E Sixteen' };
   }
   const approvedRows = (await queue('?status=approved')).registrations || [];
-  const ids16 = approvedRows.map((r) => r.team_id).slice(0, 16);
+  const approvedIds = approvedRows.map((r) => r.team_id);
+  /* RNDA + RNDB must be in the lobby regardless of listing order */
+  const ids16 = [rnda.id, rndb.id].concat(
+    approvedIds.filter((id) => id !== rnda.id && id !== rndb.id)).slice(0, 16);
   for (const tid of ids16) {
     const r = await POST(`/api/admin/groups/${g16.id}/assign`, { teamId: tid }, H);
     if (r.s !== 200) check('assign ' + tid, false, r.s + ' ' + ((r.d || {}).error || ''));

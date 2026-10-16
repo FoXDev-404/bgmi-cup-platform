@@ -32,6 +32,7 @@ sys.path.insert(0, ROOT)
 import test_api as T          # noqa: E402  (shared HTTP + fixture helpers)
 import scripts.seed_demo as seed_demo   # noqa: E402
 import broadcast              # noqa: E402  (pure engine + state builders)
+import server                 # noqa: E402  (temp DB env comes from test_api)
 
 sys.path.insert(0, os.path.join(T.ROOT, "scripts"))
 
@@ -118,8 +119,16 @@ def main():
     print("== BGMI broadcast tests @ %s ==" % T.BASE)
 
     # drop leftovers from any crashed run, then seed a clean demo world
-    seed_demo.main(clean=True)
-    seed_demo.main()
+    seed_demo.reset(server, broadcast, "full")
+    info = seed_demo.seed(server, broadcast, "full", with_results=True)
+
+    # the live fixtures below need a live match, so start one of the two
+    # scheduled lobbies directly (the seed already seated its 16-squad lineup)
+    with server_conn() as conn:
+        broadcast.start_match(conn, info["matches"]["group_a"], "test")
+        broadcast.team_kill_delta(conn, info["matches"]["group_a"],
+                                  info["group_a"][0], 2, "test")
+        conn.commit()
 
     st, _ = T.admin_login()
     report("admin session established", st == 200, "status=%s" % st)
@@ -931,7 +940,7 @@ def main():
 
     # ---------- teardown ----------
     print("\n[teardown]")
-    seed_demo.main(clean=True)
+    seed_demo.reset(server, broadcast, "full")
     with server_conn() as conn:
         left = conn.execute("SELECT COUNT(*) AS c FROM matches") \
             .fetchone()["c"]

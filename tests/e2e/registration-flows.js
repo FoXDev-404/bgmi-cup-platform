@@ -192,12 +192,12 @@ function validPayload() {
   add('bad email', (p) => { p.capEmail = 'not-an-email'; }, 400, /email/i);
   add('bad UID (letters)', (p) => { p.capUid = 'abcd1234'; }, 400, /Character ID/i);
   add('bad UID (13 digits)', (p) => { p.capUid = '1234567890123'; }, 400, /Character ID/i);
-  add('duplicate team tag (PXRA)', (p) => { p.teamTag = 'PXRA'; }, 409, /tag/i);
+  add('duplicate team tag (HLEF)', (p) => { p.teamTag = 'HLEF'; }, 409, /tag/i);
   add('duplicate UID across squads', (p) => {
     const r = JSON.parse(p.roster);        // the roster uid is the unique one
-    r[0].uid = '900013700';
+    r[0].uid = '400000001';
     p.roster = JSON.stringify(r);
-    p.capUid = '900013700';
+    p.capUid = '400000001';
   }, 409, /already on squad/i);
   add('5 starters', (p) => {
     const r = JSON.parse(p.roster);

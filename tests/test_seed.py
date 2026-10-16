@@ -243,23 +243,23 @@ try:
     try:
         by_status = {r["status"]: r["c"] for r in c.execute(
             "SELECT status, COUNT(*) AS c FROM registrations GROUP BY status")}
-        report("24 approved + pending/needs_changes/rejected/waitlisted",
-               by_status == {"approved": 24, "pending": 3, "needs_changes": 2,
-                             "rejected": 2, "waitlisted": 1}, str(by_status))
+        report("20 approved + pending/needs_changes/rejected/waitlisted",
+               by_status == {"approved": 20, "pending": 6, "needs_changes": 1,
+                             "rejected": 3, "waitlisted": 2}, str(by_status))
         assigned = scalar(c, "SELECT COUNT(*) FROM registrations "
                              "WHERE status = 'approved' AND group_id IS NOT NULL")
         report("approved squads sit in the two groups",
-               assigned == 24 and
+               assigned == 20 and
                scalar(c, "SELECT COUNT(DISTINCT group_id) FROM registrations "
                          "WHERE group_id IS NOT NULL") == 2)
         report("still one scheduled match per group",
                scalar(c, "SELECT COUNT(*) FROM matches WHERE status = 'upcoming'") == 2)
         report("decided rows carry notes, pending does not",
                scalar(c, "SELECT COUNT(*) FROM registrations WHERE status = 'pending' "
-                         "AND status_note = ''") == 3 and
+                         "AND status_note = ''") == 6 and
                scalar(c, "SELECT COUNT(*) FROM registrations "
                          "WHERE status IN ('needs_changes','rejected','waitlisted') "
-                         "AND status_note <> ''") == 5)
+                         "AND status_note <> ''") == 6)
     finally:
         c.close()
 

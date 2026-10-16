@@ -118,8 +118,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     badCsrf.s === 403, badCsrf.s);
   const set14 = await POST('/api/admin/settings', { slot_limit: 14 }, { 'X-Admin-CSRF': csrf });
   check('write with the real token -> 200', set14.s === 200, set14.s);
-  const back16 = await POST('/api/admin/settings', { slot_limit: 16 }, { 'X-Admin-CSRF': csrf });
-  check('slot limit set back to 16', back16.s === 200, back16.s);
+  const raised = await POST('/api/admin/settings', { slot_limit: 40 }, { 'X-Admin-CSRF': csrf });
+  check('slot limit raised for the fixture approvals', raised.s === 200, raised.s);
 
   /* ---------- 2. fixtures + duplicate warning + reject + /status ---------- */
   console.log('\n[2. fixtures, duplicate warning, reject with reason]');
@@ -164,7 +164,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     JSON.stringify(cnfl));
   let qd = await queue();
   check('queue reports counts + slot info',
-    qd && qd.ok && qd.counts && qd.slot_limit === 16 && typeof qd.remaining === 'number',
+    qd && qd.ok && qd.counts && qd.slot_limit === 40 && typeof qd.remaining === 'number',
     JSON.stringify(qd && qd.counts));
   const conflictKeys = Object.keys(qd.conflicts || {});
   check('duplicate phone/name flagged as a conflict',
@@ -191,12 +191,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('search finds STTB', !!sttbRow && sttbRow.team_tag === 'STTB',
     JSON.stringify((qd.registrations || []).length));
   const dupUid = await PUT(`/api/admin/registrations/${sttbRow.team_id}`,
-    { capUid: '900013700' }, { 'X-Admin-CSRF': csrf });
+    { capUid: '400000001' }, { 'X-Admin-CSRF': csrf });
   check('edit to an existing UID -> blocked',
     dupUid.s === 400 && /already on squad/.test((dupUid.d || {}).error || ''),
     dupUid.s + ' ' + ((dupUid.d || {}).error || ''));
   const dupTag = await PUT(`/api/admin/registrations/${sttbRow.team_id}`,
-    { teamTag: 'PXRA' }, { 'X-Admin-CSRF': csrf });
+    { teamTag: 'HLEF' }, { 'X-Admin-CSRF': csrf });
   check('edit to an existing tag -> blocked',
     dupTag.s === 400 && /already belongs/.test((dupTag.d || {}).error || ''),
     dupTag.s + ' ' + ((dupTag.d || {}).error || ''));
@@ -314,7 +314,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.waitForTimeout(500);
   const filtered = await page.locator('body').innerText();
   check('queue search filters the table',
-    filtered.includes('Status Squad A') && !filtered.includes('Pixel Raiders'),
+    filtered.includes('Status Squad A') && !filtered.includes('Hidden Leaf'),
     'screenshot next');
   await page.screenshot({ path: path.join(SHOTS, 'admin-queue-search-1440.png'),
     fullPage: true });
@@ -362,10 +362,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('counts sum to the queue total',
     sumCounts === allQueue.registrations.length,
     sumCounts + ' vs ' + allQueue.registrations.length);
-  const rejectedList = await queue('?status=rejected');
-  const seedRejected = rejectedList.registrations.filter((r) => r.team_tag !== 'CNFL');
+  /* the full seed carries no rejected rows, so build two for the bulk */
+  const rjta = await registerTeam(squad('E2E Bulk Reject A', 'RJTA', '606005001',
+    '9811155551', 'rjta@demo.invalid', 'RJTACAP'));
+  const rjtb = await registerTeam(squad('E2E Bulk Reject B', 'RJTB', '606006001',
+    '9811155552', 'rjtb@demo.invalid', 'RJTBCAP'));
+  check('bulk fixture squads registered', !!(rjta && rjtb),
+    JSON.stringify([rjta, rjtb]));
+  await setStatus(rjta.id, 'rejected', 'E2E bulk target A.');
+  await setStatus(rjtb.id, 'rejected', 'E2E bulk target B.');
   const bulk = await POST('/api/admin/bulk-status', {
-    teamIds: [seedRejected[0].team_id, seedRejected[1].team_id],
+    teamIds: [rjta.id, rjtb.id],
     status: 'waitlisted', note: 'E2E bulk waitlist.', override: false,
   }, { 'X-Admin-CSRF': csrf });
   check('bulk-status moves two teams to waitlisted',
@@ -380,39 +387,32 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   /* ---------- 6. approval ladder + slot limit ---------- */
   console.log('\n[6. approvals + slot limit + override]');
   qd = await queue('?status=pending');
-  const pending = qd.registrations;
-  const t = Object.fromEntries(pending.map((r) => [r.team_tag, r]));
-  const seedTags = pending.filter((r) => /^STT/.test(r.team_tag) === false)
-    .map((r) => r.team_tag);
-  const nc = await setStatus(t[seedTags[0]].team_id, 'needs_changes',
+  const t = Object.fromEntries(qd.registrations.map((r) => [r.team_tag, r]));
+  const nc = await setStatus(t['STTB'].team_id, 'needs_changes',
     'E2E: fix the captain UID and re-submit.');
   check('request changes (needs_changes) with a note', nc.s === 200, nc.s);
-  const wl = await setStatus(t[seedTags[1]].team_id, 'waitlisted', 'E2E waitlist.');
+  const wl = await setStatus(t['STTB'].team_id, 'waitlisted', 'E2E waitlist.');
   check('waitlist action', wl.s === 200, wl.s);
-  for (const tag of seedTags.slice(2)) {
-    const r = await setStatus(t[tag].team_id, 'approved', '');
-    check(`approve seed team ${tag}`, r.s === 200, r.s);
-  }
-  let r16 = await setStatus(t['STTB'].team_id, 'approved', '');
-  const up1 = await setStatus(t[seedTags[0]].team_id, 'approved', '');
-  const up2 = await setStatus(t[seedTags[1]].team_id, 'approved', '');
-  const counts16 = (await queue()).counts;
-  check('approved count now at the slot limit',
-    r16.s === 200 && up1.s === 200 && up2.s === 200 && counts16.approved === 16,
-    'approved=' + counts16.approved);
-  const blocked = await setStatus(cnfl.id, 'approved', '');
-  check('approving beyond 16 -> slot-limit error',
+  /* pin the limit to the current count so the next approval must trip it */
+  const curApproved = (await queue()).counts.approved;
+  await POST('/api/admin/settings', { slot_limit: curApproved },
+    { 'X-Admin-CSRF': csrf });
+  const blocked = await setStatus(t['STTB'].team_id, 'approved', '');
+  check('approving beyond the limit -> slot-limit error',
     blocked.s === 400 && /Slot limit reached/.test((blocked.d || {}).error || ''),
     blocked.s + ' ' + ((blocked.d || {}).error || ''));
-  const overridden = await setStatus(cnfl.id, 'approved', '', true);
+  const overridden = await setStatus(t['STTB'].team_id, 'approved', '', true);
   const counts17 = (await queue()).counts;
-  check('override approves the 17th team',
-    overridden.s === 200 && counts17.approved === 17,
+  check('override approves past the limit',
+    overridden.s === 200 && counts17.approved === curApproved + 1,
     'approved=' + counts17.approved);
-  const ncApprove = await setStatus(t[seedTags[0]].team_id, 'rejected',
+  const ncApprove = await setStatus(t['STTB'].team_id, 'rejected',
     'E2E closing check.');
   check('a further status change still applies (rejected again)',
     ncApprove.s === 200, ncApprove.s);
+  /* headroom again for anything later */
+  await POST('/api/admin/settings', { slot_limit: 40 },
+    { 'X-Admin-CSRF': csrf });
 
   /* ---------- 7. settings ---------- */
   console.log('\n[7. settings]');

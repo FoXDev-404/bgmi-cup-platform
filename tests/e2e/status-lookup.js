@@ -175,6 +175,16 @@ function squad(tag, name, baseUid, phone, email) {
   }, [ADMIN_USER, ADMIN_PASS]);
   check('admin login via API', token.status === 200 && !!token.json,
     token.status);
+  /* the seeded demo fills the default 32 slots - make room first */
+  const raiseLim = await page.evaluate(async (csrf) =>
+    fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-CSRF': csrf },
+      body: JSON.stringify({ slot_limit: 40 }),
+    }).then(async (r) => ({ status: r.status,
+      json: await r.json().catch(() => null) })), token.json && token.json.csrf);
+  check('slot limit raised for the approval', raiseLim.status === 200,
+    raiseLim.status + ' ' + JSON.stringify(raiseLim.json).slice(0, 60));
   const approve = await page.evaluate(async ([tid, csrf]) =>
     fetch('/api/admin/registrations/' + tid + '/status', {
       method: 'POST',

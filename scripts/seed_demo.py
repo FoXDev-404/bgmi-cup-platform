@@ -95,9 +95,9 @@ POOL = [
 SCENARIOS = {
     # tournament-ready: every squad approved, both groups full
     "full": ["approved"] * 32,
-    # UI review pass: 24 approved + the rest in every other status
-    "mixed": (["approved"] * 24 + ["pending"] * 3 + ["needs_changes"] * 2 +
-              ["rejected"] * 2 + ["waitlisted"]),
+    # UI review pass: 20 approved + the rest in every other status
+    "mixed": (["approved"] * 20 + ["pending"] * 6 + ["rejected"] * 3 +
+              ["waitlisted"] * 2 + ["needs_changes"]),
 }
 
 STATUS_NOTES = {
@@ -278,6 +278,9 @@ def reset(server, broadcast, scenario):
                 try:
                     conn.execute("BEGIN IMMEDIATE")
                     broadcast.migrate(conn)
+                    logos = [r["logo_path"] for r in conn.execute(
+                        "SELECT logo_path FROM registrations "
+                        "WHERE logo_path IS NOT NULL")]
                     for table in ("event_log", "player_stats",
                                   "match_team_results", "matches",
                                   "overlay_settings", "change_requests",
@@ -299,6 +302,13 @@ def reset(server, broadcast, scenario):
                     conn.commit()
                 finally:
                     conn.close()
+            # the tx committed and any backup has captured the files by now
+            for lp in logos:
+                try:
+                    os.remove(os.path.join(server.UPLOAD_DIR,
+                                           os.path.basename(lp)))
+                except OSError:
+                    pass
             return
         except sqlite3.OperationalError as e:
             last = e
@@ -367,7 +377,7 @@ def parse_args(argv):
     ap.add_argument("--yes", action="store_true",
                     help="skip the typed RESET confirmation")
     ap.add_argument("--scenario", choices=sorted(SCENARIOS), default="full",
-                    help="full = all 32 approved; mixed = 24 approved + other "
+                    help="full = all 32 approved; mixed = 20 approved + other "
                          "statuses (default: full)")
     ap.add_argument("--with-results", action="store_true",
                     help="also play + publish a Group A opener")
@@ -390,88 +400,21 @@ def _play_opener(conn, broadcast, group, lineup):
     return match["id"]
 
 
-def main(argv=None):
-    args = parse_args(argv)
-    db_path = os.path.abspath(
-        args.db or os.environ.get("BGMI_DB_PATH") or
-        os.environ.get("BGMI_DB") or
-        os.path.join(ROOT, "data", "registrations.db"))
-    uploads_dir = os.path.abspath(
-        args.uploads or os.environ.get("BGMI_UPLOADS") or
-        os.path.join(os.path.dirname(db_path), "uploads"))
-    os.environ["BGMI_DB"] = db_path
-    os.environ["BGMI_UPLOADS"] = uploads_dir
-    if ROOT not in sys.path:
-        sys.path.insert(0, ROOT)
-    import server
-    import broadcast
+def seed(server, broadcast, scenario, with_results=False, uploads_dir=None):
+    """Insert the 32-team payload into an already-reset database.
 
-    existed = os.path.exists(db_path)
-    server.init_db()
-
-    total = offending = 0
-    conn = server.db()
-    try:
-        total, offending, marker = demo_state(conn)
-        stale_logos = [r["logo_path"] for r in conn.execute(
-            "SELECT logo_path FROM registrations WHERE logo_path IS NOT NULL")]
-    finally:
-        conn.close()
-
-    real = total > 0 and offending > 0
-    if real and not args.reset:
-        print("STOP: %d of %d registrations look like REAL data "
-              "(not @example.com / @demo.invalid)." % (offending, total))
-        print("Nothing was changed. Review the database, then re-run with "
-              "--reset to archive it to backups/ first and re-seed.")
-        return 1
-    if total > 0 and (real or args.reset) and not args.yes:
-        if not sys.stdin.isatty():
-            print("Refusing to wipe a database without confirmation in a "
-                  "non-interactive shell. Re-run with --yes when you are sure.")
-            return 2
-        answer = input("This wipes every team and re-seeds demo data. "
-                       "Type RESET to continue: ")
-        if answer.strip() != "RESET":
-            print("Aborted - nothing was changed.")
-            return 2
-
-    # validate every team up front: bad data must never cost the database
-    try:
-        specs = build_specs(server, args.scenario)
-    except server.ValidationError as e:
-        print("Seed data failed validation: %s" % e.message)
-        return 4
-
-    backup_path = None
-    if existed and total > 0:
-        try:
-            backup_path = backup(db_path, uploads_dir)
-        except Exception as e:
-            print("Backup failed (%s) - nothing was changed." % e)
-            return 3
-        print("Backup: %s (verified)" % backup_path)
-
-    reset(server, broadcast, args.scenario)
-
-    # stale logo files (previous seed / purge leftovers) go after the tx
-    # committed and the backup captured them
-    for lp in stale_logos:
-        try:
-            os.remove(os.path.join(uploads_dir, os.path.basename(lp)))
-        except OSError:
-            pass
-
+    Validates every team through the register API's own validators, uses the
+    normal id/code allocators, and returns the created ids so callers (tests)
+    can address the rows.  main() wraps this with the backup + rails.
+    """
+    if uploads_dir is None:
+        uploads_dir = server.UPLOAD_DIR
+    specs = build_specs(server, scenario)
     now = datetime.now(timezone.utc)
     team_ids, reg_codes, logo_meta = [], [], []
     for spec in specs:
-        try:
-            tid = server.insert_registration(spec["data"], spec["members"],
-                                             "seed", None)
-        except server.ValidationError as e:
-            print("Team %d (%s) failed validation: %s"
-                  % (spec["index"] + 1, spec["data"]["teamName"], e.message))
-            return 4
+        tid = server.insert_registration(spec["data"], spec["members"],
+                                         "seed", None)
         team_ids.append(tid)
         reg_codes.append(spec["data"].get("regCode", ""))
         logo_meta.append((tid, spec["tag"]))
@@ -496,7 +439,8 @@ def main(argv=None):
             conn.close()
 
     # statuses, groups, demo marker
-    approved_ids = [tid for tid, s in zip(team_ids, specs) if s["status"] == "approved"]
+    approved_ids = [tid for tid, s in zip(team_ids, specs)
+                    if s["status"] == "approved"]
     half = len(approved_ids) // 2 if len(approved_ids) < 32 else 16
     group_a, group_b = approved_ids[:half], approved_ids[half:]
     with server.DB_LOCK:
@@ -536,21 +480,101 @@ def main(argv=None):
             conn.close()
 
     # schedule: one upcoming match per group (+ optional played opener)
+    matches = {}
     with server.DB_LOCK:
         conn = server.db()
         try:
             conn.execute("BEGIN IMMEDIATE")
-            if args.with_results:
-                _play_opener(conn, broadcast, "Group A", group_a[:16])
+            if with_results:
+                matches["opener"] = _play_opener(conn, broadcast, "Group A",
+                                                 group_a[:16])
             m_a = broadcast.create_match(conn, "Group A", "Erangel",
                                          "Group stage - scheduled", "seed")
             broadcast.set_lineup(conn, m_a["id"], group_a[:16])
+            matches["group_a"] = m_a["id"]
             m_b = broadcast.create_match(conn, "Group B", "Miramar",
                                          "Group stage - scheduled", "seed")
             broadcast.set_lineup(conn, m_b["id"], group_b[:16])
+            matches["group_b"] = m_b["id"]
             conn.commit()
         finally:
             conn.close()
+
+    return {"team_ids": team_ids, "approved": approved_ids,
+            "group_a": group_a, "group_b": group_b, "matches": matches,
+            "reg_codes": reg_codes, "logos": len(logo_paths),
+            "scenario": scenario}
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    db_path = os.path.abspath(
+        args.db or os.environ.get("BGMI_DB_PATH") or
+        os.environ.get("BGMI_DB") or
+        os.path.join(ROOT, "data", "registrations.db"))
+    uploads_dir = os.path.abspath(
+        args.uploads or os.environ.get("BGMI_UPLOADS") or
+        os.path.join(os.path.dirname(db_path), "uploads"))
+    os.environ["BGMI_DB"] = db_path
+    os.environ["BGMI_UPLOADS"] = uploads_dir
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    import server
+    import broadcast
+
+    existed = os.path.exists(db_path)
+    server.init_db()
+
+    total = offending = 0
+    conn = server.db()
+    try:
+        total, offending, marker = demo_state(conn)
+    finally:
+        conn.close()
+
+    real = total > 0 and offending > 0
+    if real and not args.reset:
+        print("STOP: %d of %d registrations look like REAL data "
+              "(not @example.com / @demo.invalid)." % (offending, total))
+        print("Nothing was changed. Review the database, then re-run with "
+              "--reset to archive it to backups/ first and re-seed.")
+        return 1
+    if total > 0 and (real or args.reset) and not args.yes:
+        if not sys.stdin.isatty():
+            print("Refusing to wipe a database without confirmation in a "
+                  "non-interactive shell. Re-run with --yes when you are sure.")
+            return 2
+        answer = input("This wipes every team and re-seeds demo data. "
+                       "Type RESET to continue: ")
+        if answer.strip() != "RESET":
+            print("Aborted - nothing was changed.")
+            return 2
+
+    # validate every team up front: bad data must never cost the database
+    try:
+        specs = build_specs(server, args.scenario)
+    except server.ValidationError as e:
+        print("Seed data failed validation: %s" % e.message)
+        return 4
+
+    backup_path = None
+    if existed and total > 0:
+        try:
+            backup_path = backup(db_path, uploads_dir)
+        except Exception as e:
+            print("Backup failed (%s) - nothing was changed." % e)
+            return 3
+        print("Backup: %s (verified)" % backup_path)
+
+    reset(server, broadcast, args.scenario)
+    try:
+        info = seed(server, broadcast, args.scenario, args.with_results,
+                    uploads_dir)
+    except server.ValidationError as e:
+        print("Team failed validation: %s" % e.message)
+        return 4
+    team_ids, reg_codes = info["team_ids"], info["reg_codes"]
+    group_a, group_b = info["group_a"], info["group_b"]
 
     # report
     conn = server.db()
@@ -575,7 +599,7 @@ def main(argv=None):
           % (groups, len(group_a), len(group_b)))
     print("  Matches: %d total, %d published, %d upcoming"
           % (matches, published, matches - published))
-    print("  Logos:   %d PNG tiles in %s" % (len(logo_paths), uploads_dir))
+    print("  Logos:   %d PNG tiles in %s" % (info["logos"], uploads_dir))
     print("  Reg codes: %s .. %s" % (reg_codes[0], reg_codes[-1]))
     print("  DEMO DATA badge is on (settings.demo_seed); purge removes it.")
     print("  Next:    python server.py  (admin login via scripts/create_admin.py)")

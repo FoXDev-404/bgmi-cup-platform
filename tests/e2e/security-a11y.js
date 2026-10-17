@@ -264,8 +264,17 @@ function raw(method, pathAndQuery) {
   const withBench = mstate.teams.find((t) => (t.bench || []).length > 0);
   if (noBench) {
     const card = page.locator(`.bc-squad[data-team="${noBench.teamId}"]`);
-    await card.locator('[data-act="gear"]').click();
-    await card.locator('[data-act="swap"]').click();
+    /* live updates re-render the card and close an open gear menu - retry
+       the open+pick when a re-render races the click */
+    for (let attempt = 0; ; attempt += 1) {
+      await card.locator('[data-act="gear"]').click();
+      try {
+        await card.locator('[data-act="swap"]').click({ timeout: 2000 });
+        break;
+      } catch (err) {
+        if (attempt >= 4) throw err;
+      }
+    }
     await page.waitForTimeout(300);
     const toast = await page.evaluate(() => {
       const el = document.getElementById('bcToast');
@@ -280,8 +289,15 @@ function raw(method, pathAndQuery) {
   const pick = withBench || mstate.teams[0];
   const act = withBench ? 'swap' : 'adjust';
   const card2 = page.locator(`.bc-squad[data-team="${pick.teamId}"]`);
-  await card2.locator('[data-act="gear"]').click();
-  await card2.locator(`[data-act="${act}"]`).click();
+  for (let attempt = 0; ; attempt += 1) {
+    await card2.locator('[data-act="gear"]').click();
+    try {
+      await card2.locator(`[data-act="${act}"]`).click({ timeout: 2000 });
+      break;
+    } catch (err) {
+      if (attempt >= 4) throw err;
+    }
+  }
   const opened = await page.waitForSelector('dialog[open]', { timeout: 5000 })
     .then(() => true).catch(() => false);
   check('desk dialog opens (' + act + ' on ' + pick.teamTag + ')', opened);

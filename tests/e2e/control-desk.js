@@ -205,8 +205,17 @@ function check(name, ok, detail) {
   /* ---------- bench swap via the UI ---------- */
   console.log('\n[desk: substitute swap]');
   const cardB = page.locator(`.bc-squad[data-team="${rndb.id}"]`);
-  await cardB.locator('[data-act="gear"]').click();
-  await cardB.locator('[data-act="swap"]').click();
+  /* the desk re-renders on live updates, which closes an open gear menu -
+     retry the open+pick when a re-render races the click */
+  for (let attempt = 0; ; attempt += 1) {
+    await cardB.locator('[data-act="gear"]').click();
+    try {
+      await cardB.locator('[data-act="swap"]').click({ timeout: 2000 });
+      break;
+    } catch (err) {
+      if (attempt >= 4) throw err;
+    }
+  }
   await page.waitForSelector('#swIn', { timeout: 5000 });
   const inOptions = await page.locator('#swIn option').evaluateAll(
     (os) => os.map((o) => ({ value: o.value, text: o.textContent })));

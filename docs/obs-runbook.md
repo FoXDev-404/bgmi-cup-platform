@@ -1,198 +1,240 @@
-# BGMI Cup — OBS broadcast runbook
+# BGMI Cup — OBS broadcast runbook (v2)
 
 The one-page operational guide for the BGMI Cup stream setup on this machine.
-Everything is built by `scripts/obs/setup_obs.py` and verified by
-`scripts/obs/check_obs.py` — this file tells you **when to press what**.
+The easy way in: open the **`Setup`** folder in the project and double-click
+the numbered files **1 → 4** in order. Under the hood they run
+`scripts\obs\setup_obs.bat` (build/repair) and `scripts\obs\check_obs.bat`
+(verify) — this file tells you **when to press what**.
 
-- OBS profile: **BGMI Cup** · Scene collection: **BGMI Cup**
-- Canvas/output: 1920×1080 @ 60 fps (30 fps fallback), CBR, 2 s keyframes
-- Video encoder: **QSV** (auto-picked; H.264 hardware, low CPU)
+- OBS profile: **BGMI Cup** · Scene collection: **BGMI Cup v2**
+- Canvas/output: 1920×1080 @ 60 fps, CBR, 2 s keyframes, encoder **QSV**
 - Audio: 48 kHz, AAC 160 kbps
+- 16 scenes, each with its **own** browser source
+  (`<SCENE> · <overlay>` → `/overlay/<overlay>?token=***`)
+- Default transition: **Fade 300 ms** · Studio Mode **off** (hotkeys go
+  straight to air)
 - Recording: `C:\Users\rajpa\Videos\BGMI-Cup-Recordings` — hybrid MP4, HQ
   (never the stream bitrate/container)
-- One overlay URL drives everything (producer desk switches scenes — OBS
-  follows within a second, no refresh)
 
 ## Startup order (every broadcast day)
 
-1. **Phone** — plug USB, unlock it manually once, then run
-   `scripts\obs\start_phone_capture.bat` (`start_phone_capture.ps1`).
-   It wakes the screen, sets USB stay-on, and starts scrcpy with audio
-   forwarding, fixed title `BGMI-PHONE`, high bitrate, 60 fps, no control.
-2. **Platform server** — `python server.py` (already running at
-   http://127.0.0.1:8080). Start `cloudflared` too if remote overlays matter.
-3. **OBS** — double-click `scripts\obs\start_obs.bat` (starts OBS with the
-   *BGMI Cup* profile + collection, or says so if it is already running).
-4. **Health check** — in a terminal:
+Everything you need is in the **`Setup`** folder — double-click the numbered
+files in order, then go live.
 
-   ```
-   scripts\obs\.venv\Scripts\python.exe scripts\obs\check_obs.py
-   ```
+1. **Platform server** — `Setup\1 - Start Platform Server.bat`
+   (http://127.0.0.1:8080; says so if it is already running). Start
+   `cloudflared` too if remote overlays matter.
+2. **Phone** — plug USB, unlock it manually once, then
+   `Setup\2 - Start Phone Mirror.bat`. It wakes the screen, keeps it on,
+   and starts scrcpy with audio forwarding, fixed window title
+   `BGMI-PHONE`, high bitrate, 60 fps, no control.
+3. **OBS** — `Setup\3 - Start OBS.bat` (profile *BGMI Cup*, collection
+   *BGMI Cup v2*; says so if OBS is already running).
+4. **Health check** — `Setup\4 - Check Everything.bat`.
 
-   Every line is `[ok]/[warn]/[fail]`. Fix anything red (usually:
-   re-run `setup_obs.py`, or start the phone mirror) until it prints
-   **READY**. Options: `--quick` (skip scene-switching probes),
-   `--keys` (press F6 in OBS to prove hotkeys), `--soak 120` (2-minute
-   fps/CPU/dropped-frame sample).
-5. **Stream key** — first time only: OBS → *Settings → Stream*, pick the
-   service, paste the key **yourself**. It is never stored in the repo and
-   these scripts never start a stream.
-6. **Phone in-game** — unlock, open BGMI, turn the ringer/sound up, and
-   confirm the **Game Audio** meter moves in OBS when the game makes noise.
-   If it does not, see *Phone/audio* troubleshooting below.
-7. Press **F4 (GAMEPLAY)** when the phone mirror is on the program, then
-   hit *Start Streaming* in OBS when the producer says go.
+   Every line is `[ok]/[warn]/[fail]`; it prints **READY** when nothing is
+   red. It verifies, per scene: source list + lock, its own browser source
+   (name, URL, scene match, token present), shutdown/refresh flags, camera
+   positions, hotkeys, transition. Options when run from a terminal:
+   `--quick` (skip scene-switching probes), `--keys` (presses F1 + Ctrl+F3
+   for a real hotkey test), `--shots` (one screenshot per scene →
+   `docs/obs/screenshots/v2/` and a distinct-content check), `--soak 120`
+   (2-minute fps/CPU/GPU/dropped frame sample).
+5. **Stream key** — first time only: OBS → *Settings → Stream*, paste the
+   key **yourself**. Never stored in the repo; these scripts never start
+   a stream.
+6. **Phone in-game** — unlock, open BGMI, sound up, confirm the **Game
+   Audio** meter moves in OBS when the game makes noise.
+7. Press the scene hotkey you need (below) and *Start Streaming* when the
+   producer says go.
 
-## Hotkeys
+## Hotkeys and what each scene is for
 
-| Key | Scene                 | Shows                                                        |
-|-----|-----------------------|--------------------------------------------------------------|
-| F1  | PRE-SHOW              | Phone mirror full-screen + overlay                           |
-| F2  | STARTING SOON         | Phone mirror + overlay (pre-match hold screen)               |
-| F3  | COUNTDOWN             | Caster camera in frame + countdown overlay                   |
-| F4  | GAMEPLAY              | Phone mirror + in-game camera frame top-right + overlay      |
-| F5  | CASTERS               | Caster camera(s) in frame(s) + overlay                       |
-| F6  | INTERMISSION          | Phone mirror + overlay break screen                          |
-| F7  | TECHNICAL DIFFICULTIES| Fallback screen while something is being fixed               |
-| F8  | ENDING                | End card                                                     |
+| Key | Scene | Purpose |
+|-----|-------|---------|
+| F1 | PRE-SHOW | Transparent lower bar over the phone feed (pre-broadcast hold) |
+| F2 | STARTING SOON | Full slate: tournament logo + “we go live” timer |
+| F3 | COUNTDOWN | Caster cam in the left frame + match-start countdown |
+| F4 | FORMAT | Points table / format slate |
+| F5 | LINEUP | Dropping team lineup slate |
+| F6 | CASTERS | Caster cam(s) + names for the commentary intro |
+| F7 | GAMEPLAY | Phone mirror + live scoreboard + corner cam + info strip |
+| F8 | CHICKEN DINNER | Winner celebration panel over gameplay |
+| F9 | FRAG LEADERS | Top-frag leaderboard panel |
+| F10 | RESULTS | Match results table |
+| F11 | OVERALL | Overall standings |
+| F12 | MVP | Player spotlight |
+| Ctrl+F1 | MAP FEED | Full-screen map / zones feed |
+| Ctrl+F2 | INTERMISSION | Break slate |
+| Ctrl+F3 | TECHNICAL DIFFICULTIES | Fallback slate while fixing |
+| Ctrl+F4 | ENDING | End card |
 
-Hotkeys are bound on the **scenes** (`OBSBasic.SelectScene`), so they work
-from any window as long as OBS is focused. They survive OBS restarts.
+Hotkeys are bound on the **scenes** (`OBSBasic.SelectScene`) in the saved
+collection — they survive restarts. F-keys need **OBS focused** (that is how
+libobs captures global hotkeys); check with `check_obs.bat --keys`.
+
+## How the scenes are wired (the v2 rule)
+
+The old single **Program Overlay** source is gone for good. The root rule:
+
+> **One browser source lives in exactly one scene.** No source and no URL is
+> ever shared between scenes; every scene owns `<SCENE> · <overlay>`, and its
+> URL path matches that scene's own overlay (`/overlay/<overlay>`).
+
+Layers, bottom → top:
+
+- **Full slates** (PRE-SHOW, STARTING SOON, COUNTDOWN, FORMAT, LINEUP,
+  CASTERS, INTERMISSION, TECHNICAL DIFFICULTIES, ENDING): a black
+  `<SCENE> · background` color source, then the scene's browser source.
+- **Gameplay panels** (GAMEPLAY, CHICKEN DINNER, FRAG LEADERS, RESULTS,
+  OVERALL, MVP, MAP FEED): the nested scene **BASE - GAMEPLAY**, then — for
+  GAMEPLAY/CASTERS/COUNTDOWN only — the camera(s), then the scene's browser
+  source on top.
+- **BASE - GAMEPLAY** shares the hardware: `Phone Capture` (Window Capture of
+  `BGMI-PHONE`, fitted to canvas), `Phone Offline Notice` (visible only when
+  scrcpy wasn't running at setup time), `Game Audio`. Cameras intentionally
+  sit *outside* BASE: their frames exist only in live/caster overlay states,
+  and each scene needs a different position.
+- The offline notice is **not** locked — if the phone comes back without a
+  script run, just hide it (eye icon) in OBS.
+
+Browser-source flags per overlay type (set by the script):
+
+- `live` and `map-feed` (steady panels): *Shutdown when not visible* **off**,
+  *Refresh browser when scene becomes active* **off** (never blank mid-air).
+- Everything else (animated / event overlays): both **on** — the page loads
+  fresh when the scene takes air.
+
+## Live data (no OBS touching mid-show)
+
+Every overlay page pulls `/api/overlay/state/<overlay>` with the token and
+subscribes to an SSE stream, so anything you change on the control desk
+(`/admin/control`), the overlays page, or the Railway site appears within
+about a second — no source refresh, no scene reload. Screenshots of a real
+desk change flipping the on-air logo live are in
+`docs/obs/screenshots/v2/live-update/`.
+
+- Scene switching mid-show = **press the hotkey**. Do not use the producer
+  desk's “Program output” buttons (v2 pins each scene to its own overlay).
+- `hidden` overlay (`/overlay/hidden`) is available via a browser source if
+  you ever want it — the ENDING scene stays fully blank.
 
 ## Cameras
 
-- **Caster Cam 1** = `USB2.0 HD UVC WebCam` (the only camera plugged in).
-  It shows in **frame 1** and is labelled **CAM 01** on the overlay, with the
-  caster name underneath (currently `FE_PSYCHO` from the platform DB).
-- **Caster Cam 2** — when you plug a second camera, run
-  `setup_obs.py` again (`--cameras 2`); it gets **frame 2** and plate
-  **CAM 02**. The overlay picks names up from the platform DB
-  (`caster.name` / `caster.name2`, fallback `CASTER 2`).
+- **Caster Cam 1** = `USB2.0 HD UVC WebCam`. Shows as CAM 01 in the caster
+  frame (COUNTDOWN/CASTERS) and in the live corner frame (GAMEPLAY), with the
+  caster name from the platform DB underneath (`FE_PSYCHO` today).
+- **Camera 2** — plug it in, then run `Setup\Rebuild OBS Setup.bat`
+  (auto-detects; from a terminal pass `--cameras 2` / `--cam1 "Name"`).
+  It gets frame 2/CAM 02 and the overlay switches to the two-frame layout
+  automatically.
 - Frame geometry lives in **`public/camera-frames.json`** — the single
-  source of truth read by both the setup script (OBS transforms) and the
-  overlay. Change a number there, re-run `setup_obs.py`, and refresh the
-  browser source if the overlay is already open.
-- **Live cam corner = top-right**, because the in-game HUD owns the other
-  corners: minimap + kill feed top-left, joystick bottom-left,
-  fire/weapon/ammo bottom-right, compass top-centre. In caster scenes the
-  camera sits in the left panel with the caster name and tagline beside it.
-- URL switches: `?frame=off` hides the frame entirely, `?frames=2` shows
-  two frames. The setup script sets these automatically to match the wired
-  cameras (`&frame=off` when none).
-
-## Producer desk & overlay states (the 16 scenes)
-
-Everything on screen (except the phone and cameras) is the **Program
-Overlay** browser source. Open `/admin/overlays`, and press the scene
-buttons in the “Program output” row — the OBS source follows within a
-second:
-
-`pre-show · stream-start · countdown · caster · format · lineup · live ·
-chicken-dinner · frag-leaders · results · overall · mvp · map-feed ·
-intermission · technical-difficulties · hidden`
-
-- Score changes on the control desk (`/admin/control`: kills +1/−1,
-  damage, placement, undo `U`) appear on the overlay live — no OBS touch.
-- `hidden` blanks the overlay while the phone/camera keeps running.
-- **Phone Offline Notice** (GAMEPLAY): if the phone mirror dies, tick the
-  eye on that hidden source in OBS to show the fallback card, and hide it
-  again when the mirror is back.
+  source of truth for both the OBS transforms and the overlay. Change a
+  value, run `Setup\Rebuild OBS Setup.bat`.
+- URL switches: `?frame=off` = no frame (fewer cams), `?frames=2` = two
+  frames. The setup script sets these to match what is wired.
 
 ## Audio
 
-- **Game audio** comes from the phone via scrcpy (`Game Audio` —
-  Application Audio Capture of `scrcpy.exe`). Desktop audio is
-  **disabled** on purpose — nothing else leaks into the stream.
+- **Game audio** = Application Audio Capture of `scrcpy.exe` (`Game Audio`
+  source). Desktop audio is disabled on purpose.
 - **Mic chain**: RNNoise noise suppression → noise gate (−26/−32 dB) →
-  limiter (−6 dB). Adjust the gate in OBS → Mic/Aux → Filters if the room
-  is noisy.
-- Target levels: game ≈ **−12 dB**, mic ≈ **−10 dB** peaks.
-- Monitoring is **off** on all sources.
-- ⚠️ **Headphones, not speakers** for the casters. With speakers the mic
-  hears the game echo — you get doubled/echoing audio on stream. The gate
-  helps but cannot fix that.
-- ⚠️ **A/V sync**: USB cameras (especially cheap ones) lag a few frames.
-  Do a live check — clap in front of the camera while the phone mic picks
-  it up — then use OBS → Caster Cam → *Advanced Audio Properties* /
-  source filter *Audio/Video Sync Offset* to nudge it if lips don't match.
-- ⚠️ **Bluetooth mics**: a Bluetooth headset cannot record voice while the
-  same headset plays audio (HFP vs A2DP). If casters use the Xiaomi
-  speaker, use a **wired** mic. “Mic/Aux” follows whatever Windows marks
-  as default input.
+  limiter (−6 dB). Monitoring is off everywhere.
+- Target levels: game ≈ −12 dB, mic ≈ −10 dB peaks.
+- ⚠️ Use **headphones** at the caster desk. Speakers let the mic re-hear the
+  game (echo). The gate cannot fix that.
+- ⚠️ **A/V sync**: cheap USB cams lag a few frames — clap check, then nudge
+  with *Advanced Audio Properties / Audio-Video Sync Offset* if needed.
+- ⚠️ Bluetooth headsets can't record and play at once (HFP vs A2DP) — use a
+  wired mic.
 
 ## Recording (separate from the stream)
 
 - Folder `C:\Users\rajpa\Videos\BGMI-Cup-Recordings`, hybrid MP4 (crash-safe
-  until stop), HQ quality — **never** the stream bitrate. Takes and stop
-  both work while streaming.
-- Test once before the event: *Start Recording* → wait 10 s → *Stop* →
-  confirm the file plays → delete it.
-- End of stream: **stop the recording first** (it finalizes the MP4), then
-  stop streaming, then close the phone mirror.
+  until stop), HQ — never the stream bitrate. Takes work while streaming.
+- **Verified**: a 15 s test take was recorded and finalized through OBS's
+  own pipeline, then deleted (the folder is kept clean).
+- End of stream: stop the **recording** first, then stop streaming, then
+  close the phone mirror.
+
+## Changing one overlay URL (safely)
+
+The only two rules: it must point at **that scene's own overlay**, and it
+must carry a **valid token**.
+
+1. Preferred: rotate/change via the platform — `/admin/overlays` → *Rotate
+   token* — then run **`Setup\Rebuild OBS Setup.bat`**; it rewrites all 16
+   URLs from the database and you are done.
+2. Or edit one source manually: right-click its browser source →
+   *Properties* → the URL is
+   `<BGMI_BASE_URL>/overlay/<that-scene's overlay>?token=<token>` — 1920×1080,
+   no custom CSS, hardware acceleration on. Never copy a URL from another
+   scene's source.
+3. Run **`Setup\4 - Check Everything.bat`** — it fails loudly if any
+   URL/name/token does not match its scene or if anything is shared.
+
+To point OBS at the deployed (Railway) copy instead of localhost, set these
+**once** and run **`Setup\Rebuild OBS Setup.bat`**:
+
+```
+setx BGMI_BASE_URL "https://<your-app>.up.railway.app"
+setx BGMI_OVERLAY_TOKEN "<copy from /admin/overlays>"
+```
+
+(The token is read from the environment / local DB — the scripts never
+print it. Keep it out of chats and tickets.)
 
 ## Troubleshooting
 
+Table shorthand: `setup_obs.bat` = **`Setup\Rebuild OBS Setup.bat`**,
+`check_obs.bat` = **`Setup\4 - Check Everything.bat`**.
+
 | Symptom | Fix |
 |---|---|
-| Phone screen black/locked on stream | It's an org-managed device — it re-locks. Unlock it; then `adb shell input keyevent KEYCODE_WAKEUP` + `adb shell svc power stayon usb`. Re-run `start_phone_capture.bat` if scrcpy died. |
-| Phone mirror window missing | `scripts\obs\start_phone_capture.bat` (keeps the title `BGMI-PHONE` that OBS captures). |
-| Overlay blank / “token” errors | Token was rotated or the server restarted with a fresh DB. Re-run `setup_obs.py` (it re-reads the token) and re-open `/admin/overlays`. |
-| Overlay didn't pick up a scene press | Check the producer desk says “· on air” on the new scene; give it a second. Worst case right-click the source → *Refresh* (never enable “Refresh when active”). |
-| Camera black | Re-plug USB, run `check_obs.py`. A camera that re-enumerates changes its device id — re-run `setup_obs.py` to re-select `Caster Cam 1`. |
-| hotkeys dead | OBS must be focused for F-keys; run `check_obs.py --keys` to test. Re-bind happens on the next full `setup_obs.py` run (stop OBS first — the script does that itself). |
-| OBS asks for the websocket password | Password lives in `%APPDATA%\obs-studio\plugin_config\obs-websocket\config.json` and the `OBS_WEBSOCKET_PASSWORD` env var (also in the gitignored `.env`). Never commit it. |
-| Dropped frames / lag | `check_obs.py --soak 120`. If CPU/fps are fine but the stream drops, lower stream bitrate in OBS → Output. For a weak machine run `setup_obs.py --fps 30`. |
-| Recording won't start | Ensure the recordings folder exists (setup creates it). |
-| Audio echo | Casters on speakers → switch to headphones (see Audio). |
-| Something deeply broken | OBS → *Help → Safe Mode*; or restore the backup (below). |
+| One scene's overlay blank / token error | `check_obs.bat` says which scene; usually the token was rotated → re-run `setup_obs.bat`. |
+| Wrong overlay on a scene | Someone edited URLs — re-run `setup_obs.bat` (it restores the canonical map) and `check_obs.bat` to confirm. |
+| Phone black/locked on stream | Org-managed device re-locks. Unlock it; then `adb shell input keyevent KEYCODE_WAKEUP` + `adb shell svc power stayon usb`; restart the mirror. |
+| Phone mirror window missing | `scripts\obs\start_phone_capture.bat` (keep the `BGMI-PHONE` title). Then re-run `setup_obs.bat` so `Phone Capture` binds to it. |
+| “Phone Offline Notice” card visible during gameplay | It was up when the setup last ran (scrcpy down). Start the mirror and re-run `setup_obs.bat`, or just hide the source with the eye in OBS. |
+| Camera black | Re-plug USB, run `check_obs.bat`; if the device id changed, re-run `setup_obs.bat`. |
+| Hotkeys dead | F-keys need OBS focused; test with `check_obs.bat --keys`; re-run `setup_obs.bat` to re-bind. |
+| Overlay didn't update after a desk change | Give it a second; if stuck, right-click that scene's browser source → *Refresh*. |
+| OBS asks for the websocket password | It lives in `%APPDATA%\obs-studio\plugin_config\obs-websocket\config.json` and the `OBS_WEBSOCKET_PASSWORD` env var (gitignored `.env`). |
+| Dropped frames / lag | `check_obs.bat --soak 120`. If the machine is weak, `setup_obs.bat --fps 30`. |
+| Something deeply broken | OBS → *Help → Safe Mode*, or restore the backup below. |
 
-## Restore the pre-change OBS settings (backup)
+## Restore the old setup (backup)
 
-Backup folder: `C:\Users\rajpa\obs-backups\obs-studio-2026-10-17-165301`
-(taken before this setup was built).
+Backup taken before v2: `C:\Users\rajpa\obs-backups\obs-studio-20261017-202707`.
 
 1. Close OBS completely.
 2. Copy the backup's `profiles\` and `scenes\` folders back over
    `%APPDATA%\obs-studio\basic\`.
-3. Start OBS. The old collections/profiles (e.g. *Untitled*) are back.
-   (The *BGMI Cup* profile + collection stay in the backup's copy you
-   overwrote — keep the backup folder around until you're sure.)
+3. Start OBS — the old scene collection (**BGMI Cup**, 1 scene) and any
+   older profiles are back. The v2 collection file stays in the folder, so
+   you can switch between them in *Scene Collection* at any time.
 
 ## End-of-stream checklist
 
-- [ ] Stop the **recording** (flushes the MP4) — then stop streaming.
-- [ ] Press **F8 (ENDING)** for the end card, then stop streaming in OBS.
-- [ ] Close the phone mirror window (`scrcpy`).
+- [ ] Stop the **recording** (finalizes the MP4), then stop streaming.
+- [ ] Press **Ctrl+F4 (ENDING)**, then stop streaming if you haven't.
+- [ ] Close the phone mirror window (scrcpy).
 - [ ] Rotate the overlay token if the URLs were shared publicly
-      (`/admin/overlays` → *Rotate token* → re-run `setup_obs.py`).
+      (`/admin/overlays` → *Rotate token* → re-run `setup_obs.bat`).
 - [ ] Back up the database (`python scripts\backup_db.py`).
-
-## Environment variables (remote/Railway overlays)
-
-Local overlays need nothing. To point OBS at a deployed copy, set these
-**once** in a new terminal, then re-run `setup_obs.py`:
-
-```
-setx BGMI_BASE_URL "https://<your-app>.up.railway.app"
-setx BGMI_OVERLAY_TOKEN "<paste from /admin/overlays>"
-```
-
-Then `check_obs.py` should show the overlay URL with
-`token=***` redacted but pointing at your domain. Keep the token out of
-chats and tickets — rotating it invalidates every old URL.
 
 ## Rebuilding / changing things
 
 | Want | Command |
 |---|---|
-| Rebuild everything (idempotent) | `scripts\obs\.venv\Scripts\python.exe scripts\obs\setup_obs.py` |
-| 30 fps fallback | `... setup_obs.py --fps 30` |
-| 0/1/2 cameras | `... setup_obs.py --cameras 2` (or `--cam1 "Name"`/`--cam2 "Name"`) |
-| Force an encoder | `... setup_obs.py --encoder nvenc` (default `auto`) |
-| Fast tweak without an OBS relaunch | add `--no-restart` |
-| Verify | `... check_obs.py` (`--quick`, `--keys`, `--soak 120`) |
+| Rebuild everything (idempotent) | double-click `Setup\Rebuild OBS Setup.bat` |
+| 30 fps fallback | `setup_obs.bat --fps 30` |
+| 0/1/2 cameras | `setup_obs.bat --cameras 2` (or `--cam1 "Name"` / `--cam2 "Name"`) |
+| Force an encoder | `setup_obs.bat --encoder nvenc` (default `auto`) |
+| Fast tweak without OBS relaunch | `setup_obs.bat --no-restart` |
+| Verify | double-click `Setup\4 - Check Everything.bat` (`--quick`, `--keys`, `--shots`, `--soak 120`) |
 
-The setup script exits OBS gracefully, patches the scene-collection JSON
-(hotkeys + global audio devices have no websocket API), writes a
-token-free export to `scripts/obs/scene-collection-export.json`, and
-relaunches OBS. It never touches the stream key or starts a stream.
+The build exits OBS gracefully, patches the scene-collection JSON
+(hotkeys + global audio devices have no websocket API), writes a token-free
+export to `scripts/obs/scene-collection-export.json`, and relaunches OBS. It
+never touches the stream key and never starts a stream.

@@ -94,15 +94,6 @@ def overlay_target():
     return "http://127.0.0.1:8080", local_overlay_token(), "local"
 
 
-def program_url(frames=None):
-    """One-URL program overlay (follows the producer desk scene switcher)."""
-    base, token, origin = overlay_target()
-    url = "%s/overlay/program?token=%s" % (base, token)
-    if frames:
-        url += "&frames=%d" % int(frames)
-    return url, origin
-
-
 def scene_url(scene, frames=None):
     base, token, origin = overlay_target()
     url = "%s/overlay/%s?token=%s" % (base, scene, token)

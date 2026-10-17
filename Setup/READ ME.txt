@@ -1,0 +1,32 @@
+BGMI CUP - WHAT TO RUN (double-click, in this order)
+=====================================================
+
+Every broadcast day:
+
+  1 - Start Platform Server.bat   The website + overlay backend
+                                  (http://127.0.0.1:8080). Says so if it is
+                                  already running. Keep the window open
+                                  while you broadcast.
+
+  2 - Start Phone Mirror.bat      Shows the phone screen on this PC.
+                                  Plug the phone in with USB and unlock it
+                                  first. The window title must stay
+                                  "BGMI-PHONE".
+
+  3 - Start OBS.bat               Opens OBS with the "BGMI Cup v2"
+                                  collection. Says so if OBS is already open.
+
+  4 - Check Everything.bat        Green/red check of the whole setup.
+                                  Wait until it prints READY before going
+                                  live. (Takes about a minute.)
+
+Only when needed:
+
+  Rebuild OBS Setup.bat           Repairs/rebuilds all 16 OBS scenes and
+                                  sources. Safe to re-run. Use it after
+                                  connecting a new camera, after starting
+                                  the phone mirror, or when
+                                  "4 - Check Everything.bat" shows red.
+                                  (It closes and reopens OBS.)
+
+Full details + troubleshooting: docs\obs-runbook.md in the project folder.

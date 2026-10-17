@@ -14,6 +14,6 @@ if not errorlevel 1 (
   echo OBS is already running.
   exit /b 0
 )
-echo Starting OBS (profile "BGMI Cup", collection "BGMI Cup")...
-start "" /D "%OBS_DIR%" "%OBS_DIR%\obs64.exe" --profile "BGMI Cup" --collection "BGMI Cup" --disable-shutdown-check
+echo Starting OBS (profile "BGMI Cup", collection "BGMI Cup v2")...
+start "" /D "%OBS_DIR%" "%OBS_DIR%\obs64.exe" --profile "BGMI Cup" --collection "BGMI Cup v2" --disable-shutdown-check
 exit /b 0

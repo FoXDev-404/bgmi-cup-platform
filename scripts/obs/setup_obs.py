@@ -1,32 +1,52 @@
 #!/usr/bin/env python
-"""BGMI Cup - one-command OBS build (profile + scene collection), idempotent.
+"""BGMI Cup v2 - one-command OBS build (profile + scene collection), idempotent.
 
-Creates, on whatever machine this runs on:
+Builds, on whatever machine this runs on:
 
-  * OBS profile "BGMI Cup": 1920x1080 canvas/output, Simple output
-    (CBR 8 Mbps, ~2 s keyframes, AAC 160 kbps @ 48 kHz), recording =
-    hybrid MP4 in a separate folder (never stream settings by accident),
-    hardware encoder auto-picked (NVENC / QSV / AMD / x264).
-  * OBS scene collection "BGMI Cup": 8 scenes
-    (PRE-SHOW, STARTING SOON, COUNTDOWN, GAMEPLAY, CASTERS, INTERMISSION,
-    TECHNICAL DIFFICULTIES, ENDING) built from shared sources:
-    black background, phone mirror capture (WGC, no cursor, fit to canvas),
-    caster cameras positioned on public/camera-frames.json, scrcpy game
-    audio (application capture), one URL Program overlay browser source.
-  * F1..F8 scene hotkeys, source locking, studio mode off.
+  * OBS profile "BGMI Cup" - kept as configured (encoder, bitrate, 1080p60,
+    recording folder); it is only *created* if missing. Output settings that
+    were already configured are never rewritten.
+  * OBS scene collection "BGMI Cup v2" - 16 broadcast scenes, one dedicated
+    browser source per scene (unique name + unique URL, never shared), so
+    editing one overlay can never change another scene. A nested scene
+    "BASE - GAMEPLAY" (phone mirror + game audio) is shared on purpose by
+    the gameplay panel scenes; the caster cameras are single inputs placed
+    as scene items in GAMEPLAY / CASTERS / COUNTDOWN on the exact frame
+    coordinates from public/camera-frames.json.
+  * Fade 300 ms default transition, F1..F12 + Ctrl+F1..F4 scene hotkeys,
+    source locking, studio mode off.
+
+The 16 scenes and their overlays (all read off the app's overlay code):
+
+  PRE-SHOW              /overlay/pre-show              slate (transparent bar)
+  STARTING SOON         /overlay/stream-start          full-screen slate
+  COUNTDOWN             /overlay/countdown             full slate + caster cam window
+  FORMAT                /overlay/format                full-screen slate
+  LINEUP                /overlay/lineup                full-screen slate
+  CASTERS               /overlay/caster                full slate + caster cam window
+  GAMEPLAY              /overlay/live                  BASE + live board + cam window
+  CHICKEN DINNER        /overlay/chicken-dinner        winner panel (BASE)
+  FRAG LEADERS          /overlay/frag-leaders          top-5 panel (BASE)
+  RESULTS               /overlay/results               standings panel (BASE)
+  OVERALL               /overlay/overall               overall panel (BASE)
+  MVP                   /overlay/mvp                   spotlight panel (BASE)
+  MAP FEED              /overlay/map-feed              map frame panel (BASE)
+  INTERMISSION          /overlay/intermission          slate (transparent card)
+  TECHNICAL DIFFICULTIES /overlay/technical-difficulties slate
+  ENDING                /overlay/hidden                blank/hidden standby
 
 OBS has no websocket API for hotkey bindings (and a websocket-created
 collection starts without global audio devices), so the script exits OBS
-once, patches the scene-collection file (F1..F8 scene hotkeys, Desktop
-Audio / Mic-Aux devices), writes a token-free copy to
-scripts/obs/scene-collection-export.json and relaunches OBS.
+once, patches the scene-collection file (16 scene hotkeys incl. Ctrl
+combinations, Desktop Audio / Mic-Aux devices, scene order), writes a
+token-free copy to scripts/obs/scene-collection-export.json and relaunches.
 
 Usage:  scripts/obs/.venv/Scripts/python.exe scripts/obs/setup_obs.py
 Flags:  --fps 60|30   --cameras auto|0|1|2   --encoder auto|qsv|nvenc|amd|x264
         --cam1 NAME  --cam2 NAME   --no-restart
 
 Nothing here ever prints or stores the overlay token or the websocket
-password; the stream key is never touched.
+password; the stream key is never touched. Streaming is never started.
 """
 from __future__ import annotations
 
@@ -35,8 +55,14 @@ import io
 import json
 import os
 import subprocess
+import sys
 import time
 import uuid
+
+try:                                        # keep '·' readable on cp1252
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 import obs_config
 from obs_ws import Obs, ObsError
@@ -45,8 +71,8 @@ from obs_ws import Obs, ObsError
 # constants
 # ---------------------------------------------------------------------------
 
-PROFILE_NAME = "BGMI Cup"
-COLLECTION_NAME = "BGMI Cup"
+PROFILE_NAME = "BGMI Cup"                 # profile + output settings: kept
+COLLECTION_NAME = "BGMI Cup v2"           # brand new collection for the rebuild
 APPDATA = os.environ.get("APPDATA", "")
 PROFILES_DIR = os.path.join(APPDATA, "obs-studio", "basic", "profiles")
 SCENES_DIR = os.path.join(APPDATA, "obs-studio", "basic", "scenes")
@@ -62,22 +88,73 @@ OBS_EXES = [
                  "obs-studio", "bin", "64bit", "obs64.exe"),
 ]
 
-SCENES = ["PRE-SHOW", "STARTING SOON", "COUNTDOWN", "GAMEPLAY", "CASTERS",
-          "INTERMISSION", "TECHNICAL DIFFICULTIES", "ENDING"]
-HOTKEYS = ["OBS_KEY_F1", "OBS_KEY_F2", "OBS_KEY_F3", "OBS_KEY_F4",
-           "OBS_KEY_F5", "OBS_KEY_F6", "OBS_KEY_F7", "OBS_KEY_F8"]
+# Scene list, in broadcast order (F1 -> Ctrl+F4). BASE - GAMEPLAY is a
+# support scene (nested into others), not a broadcast scene.
+SCENES = [
+    "PRE-SHOW", "STARTING SOON", "COUNTDOWN", "FORMAT", "LINEUP", "CASTERS",
+    "GAMEPLAY", "CHICKEN DINNER", "FRAG LEADERS", "RESULTS", "OVERALL", "MVP",
+    "MAP FEED", "INTERMISSION", "TECHNICAL DIFFICULTIES", "ENDING",
+]
+BASE_SCENE = "BASE - GAMEPLAY"
+UNLOCKED = {"Phone Offline Notice"}       # stays draggable on purpose
 
-PHONE_SCENES = {"PRE-SHOW", "STARTING SOON", "GAMEPLAY", "INTERMISSION"}
-CAM_FAMILY = {"COUNTDOWN": "caster", "GAMEPLAY": "live",
-              "CASTERS": "caster", "ENDING": "caster"}
+# scene -> overlay page name (exactly the app's /overlay/<name>)
+OVERLAY_FOR_SCENE = {
+    "PRE-SHOW": "pre-show",
+    "STARTING SOON": "stream-start",
+    "COUNTDOWN": "countdown",
+    "FORMAT": "format",
+    "LINEUP": "lineup",
+    "CASTERS": "caster",
+    "GAMEPLAY": "live",
+    "CHICKEN DINNER": "chicken-dinner",
+    "FRAG LEADERS": "frag-leaders",
+    "RESULTS": "results",
+    "OVERALL": "overall",
+    "MVP": "mvp",
+    "MAP FEED": "map-feed",
+    "INTERMISSION": "intermission",
+    "TECHNICAL DIFFICULTIES": "technical-difficulties",
+    "ENDING": "hidden",
+}
 
-SRC_BG = "BGMI Black Background"
+# How each scene is assembled (decided from the overlay CSS/markup):
+#   slate = own black background + its browser source
+#   base  = nested BASE - GAMEPLAY scene + its browser source (panel over the
+#           phone feed; game audio keeps playing while the match is on screen)
+# COUNTDOWN and CASTERS are slates that additionally carry the caster camera
+# window from the overlay (the "caster" camera family punch-through), and
+# GAMEPLAY carries the "live" family window in the top-right corner.
+SCENE_KIND = {
+    "PRE-SHOW": "slate", "STARTING SOON": "slate", "COUNTDOWN": "cam",
+    "FORMAT": "slate", "LINEUP": "slate", "CASTERS": "cam",
+    "GAMEPLAY": "base", "CHICKEN DINNER": "base", "FRAG LEADERS": "base",
+    "RESULTS": "base", "OVERALL": "base", "MVP": "base", "MAP FEED": "base",
+    "INTERMISSION": "slate", "TECHNICAL DIFFICULTIES": "slate",
+    "ENDING": "slate",
+}
+
+# Overlays whose camera window exists; the URL gets frames=2 / frame=off
+# depending on how many cameras are wired.
+CAM_OVERLAYS = {"caster", "countdown", "live"}
+# Always-on live panels: keep the browser warm (no shutdown, no refresh);
+# every other overlay reloads when its scene becomes active so the entrance
+# animation replays.
+ALWAYS_ON_OVERLAYS = {"live", "map-feed"}
+
+# scene -> camera-frame layout family from public/camera-frames.json
+CAM_FAMILY = {"GAMEPLAY": "live", "CASTERS": "caster", "COUNTDOWN": "caster"}
+
 SRC_PHONE = "Phone Capture"
 SRC_NOTICE = "Phone Offline Notice"
 SRC_CAMS = ["Caster Cam 1", "Caster Cam 2"]
 SRC_GAME_AUDIO = "Game Audio"
-SRC_OVERLAY = "Program Overlay"
-UNLOCKED = {SRC_NOTICE}          # the notice stays draggable on purpose
+
+# F1..F12 for scenes 1-12, Ctrl+F1..Ctrl+F4 for scenes 13-16.
+# OBS stores modifiers as separate booleans next to the key (libobs
+# obs-hotkey.c load_binding/save_binding).
+HOTKEYS = ([{"key": "OBS_KEY_F%d" % n} for n in range(1, 13)] +
+           [{"key": "OBS_KEY_F%d" % n, "control": True} for n in range(1, 5)])
 
 VIRTUAL_CAM_HINTS = ("virtual", "obs-camera", "snap camera", "manycam",
                      "droidcam", "epoccam", "iriun", "nvidia broadcast",
@@ -91,6 +168,19 @@ MIC_FILTERS = [
       "attack_time": 25.0, "hold_time": 200.0, "release_time": 150.0}),
     ("Limiter", "limiter_filter", {"limit": -6.0, "release_time": 60.0}),
 ]
+
+
+def hotkey_label(index):
+    return ("F%d" % (index + 1)) if index < 12 else ("Ctrl+F%d" % (index - 11))
+
+
+def overlay_name(scene):
+    return "%s · %s" % (scene, OVERLAY_FOR_SCENE[scene])
+
+
+def bg_name(scene):
+    return "%s · background" % scene
+
 
 # ---------------------------------------------------------------------------
 # small helpers
@@ -137,6 +227,13 @@ def scene_item(o, scene, source):
     return scene_items(o, scene).get(source)
 
 
+def scrcpy_running():
+    proc = subprocess.run(
+        ["tasklist", "/FI", "IMAGENAME eq scrcpy.exe", "/FO", "CSV"],
+        capture_output=True, text=True)
+    return "scrcpy.exe" in (proc.stdout or "")
+
+
 # ---------------------------------------------------------------------------
 # OBS process control
 # ---------------------------------------------------------------------------
@@ -178,6 +275,33 @@ def wait_for_ws(timeout=60):
                      % (timeout, last))
 
 
+def wait_ready(o, timeout=60):
+    """OBS accepts websocket requests before the scene collection / output
+    are fully loaded (requests then fail with code 207 'OBS is not ready'):
+    poll until requests stop failing. When the patched v2 collection is
+    current, also wait for the global 'Mic/Aux' device to show up before
+    the caller touches audio/filters."""
+    deadline = time.time() + timeout
+    steady = 0
+    while time.time() < deadline:
+        try:
+            scenes = o.req("GetSceneList").get("scenes") or []
+            inputs = o.req("GetInputList").get("inputs") or []
+            steady += 1
+            if steady >= 2 and scenes:
+                state = o.req("GetSceneCollectionList")
+                patched = (state.get("currentSceneCollectionName")
+                           == COLLECTION_NAME)
+                has_mic = "Mic/Aux" in {i.get("inputName") for i in inputs}
+                if not patched or has_mic or steady >= 8:
+                    return True
+        except ObsError:
+            steady = 0
+        time.sleep(1.0)
+    warn("OBS did not report ready within %ss - continuing anyway" % timeout)
+    return False
+
+
 def hard_reconnect(tries=8):
     """Reconnect after an operation that can drop the websocket."""
     last = None
@@ -201,12 +325,33 @@ def connect_or_launch():
                                        "basic.ini")):
             args += ["--profile", PROFILE_NAME]
         launch_obs(args + ["--disable-shutdown-check"])
-    return wait_for_ws()
+    o = wait_for_ws()
+    wait_ready(o)
+    return o
+
+
+def ensure_not_live(o, why):
+    """Never touch output/OBS while streaming or recording."""
+    if (o.try_req("GetStreamStatus") or {}).get("outputActive"):
+        raise SystemExit(
+            "OBS is STREAMING right now - stop the stream first, then %s." % why)
+    if (o.try_req("GetRecordStatus") or {}).get("outputActive"):
+        raise SystemExit(
+            "OBS is RECORDING right now - stop the recording first, then %s."
+            % why)
 
 
 def exit_obs(timeout=45):
     if obs_process_count() == 0:
         return
+    try:                                    # refuse to kill a live output
+        o = Obs().connect()
+        ensure_not_live(o, "let setup_obs.py restart OBS")
+        o.close()
+    except SystemExit:
+        raise
+    except Exception:
+        pass
     info("asking OBS to exit (it saves the collection on the way out)...")
     subprocess.run(["taskkill", "/IM", "obs64.exe"], capture_output=True)
     deadline = time.time() + timeout
@@ -225,7 +370,9 @@ def restart_obs(collection=False):
     if collection:
         args += ["--collection", COLLECTION_NAME]
     launch_obs(args + ["--disable-shutdown-check"])
-    return wait_for_ws()
+    o = wait_for_ws()
+    wait_ready(o)
+    return o
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +381,7 @@ def restart_obs(collection=False):
 
 
 def basic_ini_text(fps, encoder):
+    """Only used when the profile does not exist yet (fresh machine)."""
     rec = REC_DIR.replace("\\", "\\\\")
     return (
         "[General]\nName={name}\n\n"
@@ -256,7 +404,12 @@ def basic_ini_text(fps, encoder):
 
 
 def ensure_profile(o, fps, encoder):
-    """True when OBS must be restarted for the profile to become current."""
+    """True when OBS must be restarted for the profile to become current.
+
+    The profile and its output settings are LEFT ALONE when they already
+    exist - this only creates a missing profile (fresh machine) and makes
+    sure it is the current one.
+    """
     basic = os.path.join(PROFILES_DIR, PROFILE_NAME, "basic.ini")
     if not os.path.isfile(basic):
         os.makedirs(os.path.dirname(basic), exist_ok=True)
@@ -266,7 +419,8 @@ def ensure_profile(o, fps, encoder):
         return True
     current = o.req("GetProfileList").get("currentProfileName", "")
     if current == PROFILE_NAME:
-        ok("profile %r is current" % PROFILE_NAME)
+        ok("profile %r is current (output settings untouched)"
+           % PROFILE_NAME)
         return False
     try:
         o.req("SetCurrentProfile", {"profileName": PROFILE_NAME})
@@ -306,52 +460,6 @@ def ensure_collection(o):
     warn("scene collection %r not current yet - restarting to load it"
          % COLLECTION_NAME)
     return True
-
-
-def set_profile_params(o, fps, encoder):
-    params = [
-        ("Output", "Mode", "Simple"),
-        ("Output", "FilenameFormatting", "BGMI-Cup %CCYY-%MM-%DD %hh-%mm-%ss"),
-        ("SimpleOutput", "FilePath", REC_DIR),
-        ("SimpleOutput", "RecFormat2", "hybrid_mp4"),
-        ("SimpleOutput", "VBitrate", "8000"),
-        ("SimpleOutput", "ABitrate", "160"),
-        ("SimpleOutput", "RecQuality", "HQ"),
-        ("SimpleOutput", "RecEncoder", encoder),
-        ("SimpleOutput", "StreamEncoder", encoder),
-        ("SimpleOutput", "StreamAudioEncoder", "aac"),
-        ("SimpleOutput", "RecAudioEncoder", "aac"),
-        ("SimpleOutput", "RecTracks", "1"),
-        ("SimpleOutput", "UseAdvanced", "false"),
-        ("Video", "BaseCX", "1920"), ("Video", "BaseCY", "1080"),
-        ("Video", "OutputCX", "1920"), ("Video", "OutputCY", "1080"),
-        ("Video", "FPSType", "1"), ("Video", "FPSInt", str(fps)),
-        ("Video", "FPSCommon", str(fps)),
-        ("Video", "ScaleType", "bicubic"),
-        ("Video", "ColorFormat", "NV12"),
-        ("Video", "ColorSpace", "709"),
-        ("Video", "ColorRange", "Partial"),
-        ("Audio", "SampleRate", "48000"),
-        ("Audio", "ChannelSetup", "Stereo"),
-    ]
-    for category, name, value in params:
-        try:
-            o.req("SetProfileParameter", {"parameterCategory": category,
-                                          "parameterName": name,
-                                          "parameterValue": value})
-        except ObsError as exc:
-            warn("profile parameter %s.%s: %s" % (category, name, exc))
-    for category, name, expect in (("Video", "FPSInt", str(fps)),
-                                   ("SimpleOutput", "RecQuality", "HQ"),
-                                   ("SimpleOutput", "RecFormat2", "hybrid_mp4"),
-                                   ("Output", "Mode", "Simple")):
-        got = (o.try_req("GetProfileParameter",
-                         {"parameterCategory": category,
-                          "parameterName": name}) or {}).get("parameterValue")
-        if got == expect:
-            ok("%s.%s = %s" % (category, name, got))
-        else:
-            warn("%s.%s is %r, wanted %r" % (category, name, got, expect))
 
 
 # ---------------------------------------------------------------------------
@@ -531,13 +639,67 @@ def notice_settings():
             "extents_wrap": False}
 
 
+def overlay_url(scene, cam_count):
+    """The scene's own overlay URL (BGMI_BASE_URL / local fallback) + the
+    camera-window parameters that match the wired cameras."""
+    name = OVERLAY_FOR_SCENE[scene]
+    url, origin = obs_config.scene_url(name)
+    if name in CAM_OVERLAYS:
+        if cam_count == 0:
+            url += "&frame=off"
+        elif cam_count == 2:
+            url += "&frames=2"
+    return url, origin
+
+
+def browser_settings(scene, url, fps):
+    always_on = OVERLAY_FOR_SCENE[scene] in ALWAYS_ON_OVERLAYS
+    return {"url": url, "width": 1920, "height": 1080,
+            "fps": fps, "fps_custom": True,
+            "shutdown": not always_on,
+            "restart_when_active": not always_on,
+            "hwaccel": True, "css": ""}
+
+
 def remove_stale_sources(o, cam_count):
+    """Remove inputs that our build must not contain (idempotent cleanup)."""
     existing = {i["inputName"]
                 for i in o.req("GetInputList").get("inputs", [])}
     for extra in SRC_CAMS[cam_count:]:
         if extra in existing:
             o.req("RemoveInput", {"inputName": extra})
             ok("removed stale camera source %r" % extra)
+    if "Program Overlay" in existing:
+        o.req("RemoveInput", {"inputName": "Program Overlay"})
+        ok("removed the old shared 'Program Overlay' source (root-cause fix)")
+
+
+def ours_sources(cam_count):
+    """Every source name this build owns."""
+    names = {SRC_PHONE, SRC_NOTICE, SRC_GAME_AUDIO}
+    names.update(SRC_CAMS[:cam_count])
+    names.update(overlay_name(s) for s in SCENES)
+    names.update(bg_name(s) for s in SCENES if SCENE_KIND[s] in ("slate", "cam"))
+    return names
+
+
+def remove_unplanned_items(o, cam_count):
+    """Drop scene items of OUR sources that are not in the planned layer
+    list for that scene. CreateInput adds the source to the scene it was
+    created in, and re-runs can leave strays (e.g. a Phone Capture item in
+    PRE-SHOW) - this keeps every scene exactly on its plan."""
+    ours = ours_sources(cam_count)
+    removed = 0
+    for scene in [BASE_SCENE] + SCENES:
+        want = set(planned_layers(scene, cam_count))
+        for name, item in scene_items(o, scene).items():
+            if name in ours and name not in want:
+                o.req("RemoveSceneItem",
+                      {"sceneName": scene,
+                       "sceneItemId": item["sceneItemId"]})
+                ok("removed stray item %r from %r" % (name, scene))
+                removed += 1
+    return removed
 
 
 # ---------------------------------------------------------------------------
@@ -546,15 +708,18 @@ def remove_stale_sources(o, cam_count):
 
 
 def planned_layers(scene, cam_count):
-    layers = [SRC_BG]
-    if scene in PHONE_SCENES:
-        layers.append(SRC_PHONE)
-        layers.append(SRC_GAME_AUDIO)
-    if scene == "GAMEPLAY":
-        layers.append(SRC_NOTICE)
+    """The exact layer list (bottom -> top) each scene must have."""
+    if scene == BASE_SCENE:
+        return [SRC_PHONE, SRC_NOTICE, SRC_GAME_AUDIO]
+    layers = []
+    kind = SCENE_KIND[scene]
+    if kind == "base":
+        layers.append(BASE_SCENE)
+    else:                                        # slate / cam scenes
+        layers.append(bg_name(scene))
     if scene in CAM_FAMILY:
         layers.extend(SRC_CAMS[:cam_count])
-    layers.append(SRC_OVERLAY)
+    layers.append(overlay_name(scene))
     return layers
 
 
@@ -594,8 +759,8 @@ def fill_transform():
 
 
 def notice_transform():
-    return {"positionX": 420, "positionY": 960, "scaleX": 1.0, "scaleY": 1.0,
-            "rotation": 0.0, "alignment": 5,
+    return {"positionX": 380, "positionY": 500, "scaleX": 1.0,
+            "scaleY": 1.0, "rotation": 0.0, "alignment": 5,
             "boundsType": "OBS_BOUNDS_NONE"}
 
 
@@ -696,28 +861,38 @@ def apply_cam_transforms(o, cam_count, measured):
 
 def ensure_scenes(o):
     step("Scenes")
-    for scene in SCENES:
+    for scene in [BASE_SCENE] + SCENES:
         ensure_scene(o, scene)
     if "Scene" in scene_names(o) and "Scene" not in SCENES:
         o.req("RemoveScene", {"sceneName": "Scene"})
         ok("removed the default 'Scene'")
-    ok("scenes ready: %s" % ", ".join(SCENES))
+    ok("scenes ready: 16 broadcast scenes + %r" % BASE_SCENE)
 
 
 def build_layers(o, cam_count):
     step("Scenes and layers")
-    for scene in SCENES:
+    remove_unplanned_items(o, cam_count)
+    notice_wanted = not scrcpy_running()
+    for scene in [BASE_SCENE] + SCENES:
         layers = planned_layers(scene, cam_count)
         for index, source in enumerate(layers):
             item = ensure_scene_item(o, scene, source)
             o.req("SetSceneItemIndex",
                   {"sceneName": scene, "sceneItemId": item["sceneItemId"],
                    "sceneItemIndex": index})
+            enabled = True
+            if source == SRC_NOTICE:
+                # Visible fallback exactly when the phone mirror is down.
+                enabled = notice_wanted
             o.req("SetSceneItemEnabled",
                   {"sceneName": scene, "sceneItemId": item["sceneItemId"],
-                   "sceneItemEnabled": source != SRC_NOTICE})
+                   "sceneItemEnabled": enabled})
+    if not notice_wanted:
+        ok("scrcpy is running - 'Phone Offline Notice' stays hidden")
+    else:
+        ok("scrcpy is NOT running - 'Phone Offline Notice' is visible")
     # static transforms
-    for scene in SCENES:
+    for scene in [BASE_SCENE] + SCENES:
         for source in planned_layers(scene, cam_count):
             item = scene_item(o, scene, source)
             if not item:
@@ -726,19 +901,21 @@ def build_layers(o, cam_count):
                 transform = phone_transform()
             elif source == SRC_NOTICE:
                 transform = notice_transform()
-            elif source in (SRC_BG, SRC_OVERLAY):
+            elif source == BASE_SCENE:
+                transform = fill_transform()
+            elif source.startswith(scene + " · ") or source == bg_name(scene):
                 transform = fill_transform()
             else:
                 continue                      # cameras: measured later
             o.req("SetSceneItemTransform",
                   {"sceneName": scene, "sceneItemId": item["sceneItemId"],
                    "sceneItemTransform": transform})
-    ok("laid out %d scenes" % len(SCENES))
+    ok("laid out %d scenes" % (len(SCENES) + 1))
 
 
 def lock_sources(o, cam_count):
     locked = 0
-    for scene in SCENES:
+    for scene in [BASE_SCENE] + SCENES:
         for source in planned_layers(scene, cam_count):
             if source in UNLOCKED:
                 continue
@@ -748,11 +925,11 @@ def lock_sources(o, cam_count):
                       {"sceneName": scene, "sceneItemId": item["sceneItemId"],
                        "sceneItemLocked": True})
                 locked += 1
-    ok("locked %d scene items (phone, cams, overlay, background)" % locked)
+    ok("locked %d scene items (backgrounds, phone, cams, overlays)" % locked)
 
 
 # ---------------------------------------------------------------------------
-# audio
+# audio / transition
 # ---------------------------------------------------------------------------
 
 
@@ -795,7 +972,7 @@ def configure_audio(o):
     if got == "disabled":
         ok("desktop audio disabled (no desktop audio on stream)")
     elif data is None:
-        warn("no 'Desktop Audio' input in this collection")
+        warn("no 'Desktop Audio' input yet in this collection")
     else:
         warn("desktop audio still %r - disable it in OBS Settings > Audio"
              % got)
@@ -808,6 +985,19 @@ def configure_audio(o):
                    "monitorType": "OBS_MONITORING_TYPE_NONE"})
     ok("monitoring off on mic / desktop / game audio")
     ensure_mic_filters(o, "Mic/Aux")
+
+
+def configure_transition(o):
+    step("Transition")
+    o.req("SetCurrentSceneTransition", {"transitionName": "Fade"})
+    o.req("SetCurrentSceneTransitionDuration", {"transitionDuration": 300})
+    got = o.try_req("GetCurrentSceneTransition") or {}
+    if got.get("transitionName") == "Fade" \
+            and int(got.get("transitionDuration") or 0) == 300:
+        ok("default transition: Fade, 300 ms")
+    else:
+        warn("transition reads %r / %r ms - set Fade 300 ms in OBS"
+             % (got.get("transitionName"), got.get("transitionDuration")))
 
 
 # ---------------------------------------------------------------------------
@@ -851,8 +1041,8 @@ def audio_device_entry(name, kind, device_id):
 
 def find_collection_file():
     """OBS sanitizes the collection name for the file on disk (spaces
-    become underscores: 'BGMI Cup' -> 'BGMI_Cup.json'), so locate the file
-    by the 'name' field inside it instead of guessing the filename."""
+    become underscores: 'BGMI Cup v2' -> 'BGMI_Cup_v2.json'), so locate
+    the file by the 'name' field inside it instead of guessing."""
     candidates = []
     try:
         names = os.listdir(SCENES_DIR)
@@ -889,10 +1079,9 @@ def patch_collection_and_export():
         if not entry:
             warn("collection json has no scene %r" % scene)
             continue
-        entry["hotkeys"] = {"OBSBasic.SelectScene":
-                            [{"key": HOTKEYS[index]}]}
+        entry["hotkeys"] = {"OBSBasic.SelectScene": [HOTKEYS[index]]}
         patched += 1
-    data["scene_order"] = [{"name": s} for s in SCENES]
+    data["scene_order"] = [{"name": s} for s in SCENES + [BASE_SCENE]]
     data["current_scene"] = SCENES[0]
     data["current_program_scene"] = SCENES[0]
     added = []
@@ -907,7 +1096,8 @@ def patch_collection_and_export():
     with io.open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=4)
         fh.write("\n")
-    ok("hotkeys F1-F8 bound to the 8 scenes (%d patched)" % patched)
+    ok("hotkeys F1-F12 + Ctrl+F1..F4 bound to the 16 scenes (%d patched)"
+       % patched)
     if added:
         ok("global audio devices added: %s" % ", ".join(added))
 
@@ -928,11 +1118,16 @@ def patch_collection_and_export():
 def final_verify(o, cam_count):
     step("Verify")
     names = scene_names(o)
-    missing = [s for s in SCENES if s not in names]
+    missing = [s for s in SCENES + [BASE_SCENE] if s not in names]
     if missing:
         warn("missing scenes: %s" % ", ".join(missing))
     else:
-        ok("all 8 scenes present")
+        ok("all 16 scenes + %r present" % BASE_SCENE)
+    if list(reversed(names))[:len(SCENES)] == SCENES:
+        ok("scene order matches the runbook (F1 PRE-SHOW ... Ctrl+F4 ENDING)")
+    else:
+        info("scene order in OBS: %s"
+             % ", ".join(reversed(names[:4])) + " ...")
     try:
         program = o.req("GetCurrentProgramScene").get(
             "currentProgramSceneName")
@@ -952,13 +1147,17 @@ def final_verify(o, cam_count):
 
 def print_summary(cams, cam_count, fps, encoder, origin, measured):
     step("Summary")
-    info("profile  : %s (encoder %s, 1920x1080@%d, CBR 8000 kbps, "
-         "AAC 160 kbps)" % (PROFILE_NAME, encoder, fps))
-    info("recording: %s (hybrid MP4, HQ preset, separate from stream)"
-         % REC_DIR)
-    info("collection: %s - 8 scenes" % COLLECTION_NAME)
+    info("profile  : %s (output settings untouched; stream encoder %s)"
+         % (PROFILE_NAME, encoder or "?"))
+    info("recording: %s (unchanged)" % REC_DIR)
+    info("collection: %s - 16 scenes, one browser source each" % COLLECTION_NAME)
     for index, scene in enumerate(SCENES):
-        info("  F%d -> %s" % (index + 1, scene))
+        kind = {"slate": "slate", "base": "BASE+overlay", "cam": "slate+cam"}[
+            SCENE_KIND[scene]]
+        info("  %-9s -> %-22s (%s, /overlay/%s)"
+             % (hotkey_label(index), scene, kind, OVERLAY_FOR_SCENE[scene]))
+    info("support   : %r is nested into the 7 gameplay panel scenes"
+         % BASE_SCENE)
     if cams:
         for index, device in enumerate(cams):
             size = measured.get(SRC_CAMS[index]) or (0, 0)
@@ -967,9 +1166,12 @@ def print_summary(cams, cam_count, fps, encoder, origin, measured):
                     ("%dx%d" % size) if size[0] else "no signal yet",
                     index + 1, index + 1))
     else:
-        warn("no camera configured - overlay URL got &frame=off")
-    info("fallback : 'Phone Offline Notice' (GAMEPLAY) is hidden by "
-         "default - reveal it (eye icon) if the phone mirror dies")
+        warn("no camera configured - overlay URLs got &frame=off")
+    if not scrcpy_running():
+        info("phone     : scrcpy is NOT running - the 'Phone Offline "
+             "Notice' card is visible in the gameplay scenes")
+    else:
+        info("phone     : scrcpy is running - offline notice hidden")
     if origin == "env":
         info("overlay  : BGMI_BASE_URL from the environment (production)")
     else:
@@ -978,8 +1180,8 @@ def print_summary(cams, cam_count, fps, encoder, origin, measured):
         print()
         obs_config.setx_hint()
     print()
-    info("stream key: NEVER touched - set service + key yourself in OBS "
-         "Settings > Stream before going live.")
+    info("stream key: NEVER touched - set it yourself in OBS Settings > "
+         "Stream before going live.")
     info("start streaming is never automated by these scripts.")
 
 
@@ -1014,11 +1216,11 @@ def main():
 
     step("Connect")
     o = connect_or_launch()
-    ok("obs-websocket reachable")
+    ensure_not_live(o, "run setup_obs.py")
+    ok("obs-websocket reachable (not streaming, not recording)")
     if ensure_profile(o, fps, encoder):
         o.close()
         o = restart_obs(collection=False)
-    set_profile_params(o, fps, encoder)
     try:
         needs_restart = ensure_collection(o)
     except ObsError as exc:
@@ -1033,28 +1235,27 @@ def main():
     ensure_scenes(o)
 
     step("Sources")
-    ensure_input(o, SRC_BG, "color_source_v3",
-                 {"color": 0xFF000000, "width": 1920, "height": 1080},
-                 "PRE-SHOW")
-    ensure_input(o, SRC_PHONE, "window_capture", {}, "PRE-SHOW")
+    for scene, kind in SCENE_KIND.items():
+        if kind in ("slate", "cam"):
+            ensure_input(o, bg_name(scene), "color_source_v3",
+                         {"color": 0xFF000000, "width": 1920, "height": 1080},
+                         scene)
+    ensure_input(o, SRC_PHONE, "window_capture", {}, BASE_SCENE)
     configure_window_capture(o, SRC_PHONE)
     ensure_input(o, SRC_NOTICE, "text_gdiplus_v3", notice_settings(),
-                 "GAMEPLAY")
+                 BASE_SCENE)
     for index, device in enumerate(cams):
         ensure_input(o, SRC_CAMS[index], "dshow_input", {}, "COUNTDOWN")
         ok("camera %d = %r" % (index + 1, device))
         configure_camera(o, SRC_CAMS[index], device)
     ensure_input(o, SRC_GAME_AUDIO, "wasapi_process_output_capture", {},
-                 "PRE-SHOW")
+                 BASE_SCENE)
     configure_app_audio(o, SRC_GAME_AUDIO)
-    url, origin = obs_config.program_url(frames=cam_count or None)
-    if cam_count == 0:
-        url += "&frame=off"
-    ensure_input(o, SRC_OVERLAY, "browser_source",
-                 {"url": url, "width": 1920, "height": 1080,
-                  "fps": fps, "fps_custom": True, "shutdown": False,
-                  "restart_when_active": False, "hwaccel": True},
-                 "PRE-SHOW")
+    origin = "local"
+    for scene in SCENES:
+        url, origin = overlay_url(scene, cam_count)
+        ensure_input(o, overlay_name(scene), "browser_source",
+                     browser_settings(scene, url, fps), scene)
     remove_stale_sources(o, cam_count)
 
     build_layers(o, cam_count)
@@ -1062,6 +1263,7 @@ def main():
     apply_cam_transforms(o, cam_count, measured)
     lock_sources(o, cam_count)
     configure_audio(o)
+    configure_transition(o)
     o.req("SetStudioModeEnabled", {"studioModeEnabled": False})
     o.req("SetCurrentProgramScene", {"sceneName": SCENES[0]})
 
@@ -1072,6 +1274,7 @@ def main():
         patch_collection_and_export()
         o = restart_obs(collection=True)
         configure_audio(o)          # global audio devices exist again now
+        configure_transition(o)
 
     final_verify(o, cam_count)
     print_summary(cams, cam_count, fps, encoder, origin, measured)

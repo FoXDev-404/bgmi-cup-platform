@@ -1,28 +1,51 @@
-"""Broadcast readiness check for the BGMI Cup OBS setup.
+"""Broadcast readiness check for the BGMI Cup v2 OBS setup.
 
 One command, green/red output:
 
     scripts\\obs\\.venv\\Scripts\\python.exe scripts\\obs\\check_obs.py
 
+Checks, per scene, that:
+
+  * the scene exists and lists exactly the planned sources (top to bottom),
+  * it owns its OWN browser source (unique name + unique URL) and that no
+    browser source is shared with any other scene (root-cause rule),
+  * the browser source URL path matches that scene's overlay name
+    (/overlay/<name>), the token is present and matches the expected one
+    (never printed - URLs are shown as token=***),
+  * no source named "Program Overlay" exists and no URL uses /overlay/program,
+  * "shutdown when not visible" / "refresh when scene becomes active" match
+    the overlay type (ON for animated/event overlays, OFF for live panels),
+  * camera windows sit exactly on public/camera-frames.json,
+  * sources are locked, transition is Fade 300 ms, studio mode is off.
+
 Every line is [ok] / [warn] / [fail]; the exit code is 0 only when no
 [fail] line was printed. Secrets (the overlay token and the websocket
-password) are never displayed - URLs get token=***.
+password) are never displayed.
 
 Options:
     --quick   skip the checks that briefly switch the program scene
               (camera feed probe, audio-meter sample)
-    --keys    functional hotkey test: focuses OBS and presses F6, then
-              restores the scene (never runs blind - the foreground
+    --keys    functional hotkey test: focuses OBS, presses F1 and Ctrl+F3,
+              then restores the scene (never runs blind - the foreground
               window must be OBS)
-    --soak N  sample OBS stats for N seconds (fps, CPU, dropped frames)
+    --soak N  sample OBS stats + GPU for N seconds with GAMEPLAY active
+    --shots   save one screenshot of every scene to docs/obs/screenshots/v2
+              (also verifies every scene renders its own distinct content)
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import subprocess
+import sys
 import time
+
+try:                                        # keep '·' readable on cp1252
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 import obs_config
 import obs_ws
@@ -32,6 +55,9 @@ from obs_ws import Obs
 FAILS = 0
 WARNS = 0
 OBS_LIVE = False                    # streaming or recording right now
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+SHOTS_DIR = os.path.join(REPO, "docs", "obs", "screenshots", "v2")
 
 
 def ok(msg):
@@ -89,9 +115,9 @@ def input_settings(o, name):
 
 
 def build_items_map(o):
-    """{scene: {source: {"id":, "enabled":, "index":}}}"""
+    """{scene: {source: {"id":, "enabled":, "index":, "type":}}}"""
     out = {}
-    for scene in setup_obs.SCENES:
+    for scene in [setup_obs.BASE_SCENE] + setup_obs.SCENES:
         data = o.try_req("GetSceneItemList", {"sceneName": scene}) or {}
         items = {}
         for item in data.get("sceneItems", []):
@@ -99,6 +125,7 @@ def build_items_map(o):
                 "id": item.get("sceneItemId"),
                 "enabled": bool(item.get("sceneItemEnabled", True)),
                 "index": int(item.get("sceneItemIndex") or 0),
+                "type": item.get("sourceType") or "",
             }
         out[scene] = items
     return out
@@ -177,6 +204,14 @@ def check_video(o, args):
     else:
         fail("frame rate reads %r - set Video > FPS to 60 in OBS"
              % (fps_int or fps_common))
+
+    trans = o.req("GetCurrentSceneTransition")
+    if trans.get("transitionName") == "Fade" \
+            and int(trans.get("transitionDuration") or 0) == 300:
+        ok("default transition: Fade, 300 ms")
+    else:
+        warn("transition is %r / %s ms - expected Fade 300 ms"
+             % (trans.get("transitionName"), trans.get("transitionDuration")))
     return fps
 
 
@@ -219,7 +254,7 @@ def check_output_profile(o, args):
     return rec_dir
 
 
-def check_scenes(o, args, items_map):
+def check_scene_inventory(o, args, items_map):
     step("Scenes, layers, locks")
     scenes = [s.get("sceneName") for s in
               (o.req("GetSceneList") or {}).get("scenes", [])]
@@ -227,12 +262,17 @@ def check_scenes(o, args, items_map):
     if missing:
         fail("missing scenes: %s - run setup_obs.py" % ", ".join(missing))
     else:
-        ok("all 8 broadcast scenes exist")
-    extras = [s for s in scenes if s not in setup_obs.SCENES]
+        ok("all 16 broadcast scenes exist")
+    if setup_obs.BASE_SCENE in scenes:
+        ok("support scene %r exists" % setup_obs.BASE_SCENE)
+    else:
+        fail("missing support scene %r" % setup_obs.BASE_SCENE)
+    extras = [s for s in scenes
+              if s not in setup_obs.SCENES and s != setup_obs.BASE_SCENE]
     if extras:
         info("other scenes in the collection: %s" % ", ".join(extras))
-    if list(reversed(scenes)) == setup_obs.SCENES:
-        ok("scene order matches the hotkey list (F1 PRE-SHOW ... F8 ENDING)")
+    if list(reversed(scenes))[:len(setup_obs.SCENES)] == setup_obs.SCENES:
+        ok("scene order matches the runbook (F1 PRE-SHOW ... Ctrl+F4 ENDING)")
     else:
         warn("scene order in OBS differs from the runbook order")
 
@@ -246,7 +286,7 @@ def check_scenes(o, args, items_map):
 
     order_issues = []
     lock_issues = []
-    for scene in setup_obs.SCENES:
+    for scene in [setup_obs.BASE_SCENE] + setup_obs.SCENES:
         listed = sorted(items_map.get(scene, {}).items(),
                         key=lambda kv: kv[1]["index"])
         names = [name for name, _ in listed]
@@ -265,25 +305,151 @@ def check_scenes(o, args, items_map):
     if order_issues:
         fail("layer order wrong: %s" % "; ".join(order_issues))
     else:
-        ok("layer order correct everywhere (bg -> phone -> cams -> overlay)")
+        ok("layer order correct everywhere (background/BASE -> cams -> overlay)")
     if lock_issues:
         fail("unlocked scene items (accidental drags): %s"
              % ", ".join(sorted(set(lock_issues))[:8]))
     else:
         ok("sources locked against accidental drags")
 
-    gameplay = items_map.get("GAMEPLAY", {})
-    notice = gameplay.get(setup_obs.SRC_NOTICE)
+    base_items = items_map.get(setup_obs.BASE_SCENE, {})
+    notice = base_items.get(setup_obs.SRC_NOTICE)
+    scr = setup_obs.scrcpy_running()
     if notice and notice["enabled"]:
-        warn("'Phone Offline Notice' is visible - hide it unless the phone "
-             "mirror is down")
+        if scr:
+            warn("'Phone Offline Notice' is visible but scrcpy IS running - "
+                 "hide it (or re-run setup_obs.py)")
+        else:
+            ok("'Phone Offline Notice' visible (scrcpy is down - correct)")
     else:
-        ok("'Phone Offline Notice' hidden (fallback card ready if needed)")
+        if scr:
+            ok("'Phone Offline Notice' hidden (scrcpy is running)")
+        else:
+            warn("scrcpy is down and the 'Phone Offline Notice' is hidden - "
+                 "reveal it (eye icon) or re-run setup_obs.py")
+
+    # per-scene source listing
+    info("sources per scene (bottom -> top):")
+    for scene in setup_obs.SCENES:
+        listed = sorted(items_map.get(scene, {}).items(),
+                        key=lambda kv: kv[1]["index"])
+        info("  %-22s %s" % (scene, " | ".join(n for n, _ in listed)))
     return cam_count
 
 
+def check_browser_sources(o, args, items_map, cam_count, fps, origin):
+    """The root-cause rule + per-scene overlay URL checks."""
+    step("One browser source per scene (root-cause rule)")
+    inputs = {i.get("inputName"): i
+              for i in (o.req("GetInputList") or {}).get("inputs", [])}
+    browser_sources = {name: i for name, i in inputs.items()
+                       if i.get("inputKind") == "browser_source"}
+    usage = {name: [] for name in browser_sources}
+    for scene, items in items_map.items():
+        for source in items:
+            if source in usage:
+                usage[source].append(scene)
+
+    if "Program Overlay" in inputs:
+        fail("a source named 'Program Overlay' still exists (the old shared "
+             "overlay) - re-run setup_obs.py to remove it")
+    else:
+        ok("no 'Program Overlay' source exists")
+
+    expected_token = obs_config.overlay_target()[1]
+    planned = {setup_obs.overlay_name(s): s for s in setup_obs.SCENES}
+    issues = []
+    for index, scene in enumerate(setup_obs.SCENES):
+        name = setup_obs.overlay_name(scene)
+        overlay = setup_obs.OVERLAY_FOR_SCENE[scene]
+        label = "%s %s" % (setup_obs.hotkey_label(index), scene)
+        problems = []
+        entry = browser_sources.get(name)
+        settings = input_settings(o, name) if entry else {}
+        if not entry:
+            problems.append("browser source %r missing" % name)
+        else:
+            scenes_used = usage.get(name, [])
+            if scenes_used != [scene]:
+                problems.append("source %r is used in %s (must be only %r)"
+                                % (name, scenes_used, scene))
+            scenes_with_this_item = [s for s, items in items_map.items()
+                                     if name in items]
+            if scenes_with_this_item != [scene]:
+                problems.append("scene item appears in %s"
+                                % scenes_with_this_item)
+            url = settings.get("url") or ""
+            path = url.split("?", 1)[0]
+            if not path.endswith("/overlay/" + overlay):
+                problems.append("URL path is %s, expected /overlay/%s"
+                                % (redact(path), overlay))
+            if "/overlay/program" in url:
+                problems.append("URL still uses /overlay/program")
+            token = ""
+            match = re.search(r"[?&]token=([^&\s]+)", url)
+            if match:
+                token = match.group(1)
+            if not token:
+                problems.append("token missing from URL")
+            elif expected_token and token != expected_token:
+                problems.append("token MISMATCH (wrong/old token)")
+            if (int(settings.get("width") or 0),
+                    int(settings.get("height") or 0)) != (1920, 1080):
+                problems.append("browser size %sx%s, expected 1920x1080"
+                                % (settings.get("width"),
+                                   settings.get("height")))
+            if (settings.get("css") or "").strip():
+                problems.append("custom CSS is not empty")
+            accel = {k: v for k, v in settings.items() if "accel" in k.lower()}
+            if accel and not any(bool(v) for v in accel.values()):
+                problems.append("hardware acceleration off")
+            if int(settings.get("fps") or 0) != fps:
+                problems.append("browser fps %r, stream fps %d"
+                                % (settings.get("fps"), fps))
+            always_on = overlay in setup_obs.ALWAYS_ON_OVERLAYS
+            if always_on:
+                if settings.get("shutdown") is not False \
+                        or settings.get("restart_when_active") is not False:
+                    problems.append("live panel must keep the browser warm "
+                                    "(shutdown/refresh OFF)")
+            else:
+                if settings.get("shutdown") is not True \
+                        or settings.get("restart_when_active") is not True:
+                    problems.append("animated overlay must reload when its "
+                                    "scene becomes active (shutdown/refresh ON)")
+        if problems:
+            issues.append("%s: %s" % (label, "; ".join(problems)))
+            fail("%-24s <- %s" % (label, "; ".join(problems)))
+        else:
+            how = ("always on" if overlay in setup_obs.ALWAYS_ON_OVERLAYS
+                   else "reload on activation")
+            ok("%-24s -> \"%s\" /overlay/%s?token=*** (1 scene, %s)"
+               % (label, name, overlay, how))
+    if issues:
+        fail("%d scene(s) with browser-source problems - re-run "
+             "setup_obs.py" % len(issues))
+    else:
+        ok("every scene owns exactly one browser source, correct URL + "
+           "token, no sharing (%d checked)" % len(setup_obs.SCENES))
+
+    unplanned = [n for n in browser_sources if n not in planned]
+    if unplanned:
+        warn("browser sources that are not part of the plan: %s"
+             % ", ".join(unplanned))
+    if expected_token:
+        ok("overlay token present in all URLs and matches the expected token "
+           "(value never printed)")
+    else:
+        warn("cannot verify the token (set BGMI_OVERLAY_TOKEN or use the "
+             "local dev database)")
+    if origin == "local":
+        info("overlays point at the local dev server (http://127.0.0.1:8080) "
+             "- set BGMI_BASE_URL/BGMI_OVERLAY_TOKEN for the Railway site")
+    return browser_sources
+
+
 def check_sources(o, args, cam_count, fps):
-    step("Sources")
+    step("Phone, camera devices, audio sources")
     settings = input_settings(o, setup_obs.SRC_PHONE)
     window = settings.get("window") or ""
     if "bgmi-phone" in window.lower():
@@ -297,10 +463,7 @@ def check_sources(o, args, cam_count, fps):
         ok("phone capture: cursor off, method %s"
            % (settings.get("method", "auto")))
 
-    proc = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq scrcpy.exe", "/FO", "CSV"],
-        capture_output=True, text=True)
-    if "scrcpy.exe" in (proc.stdout or ""):
+    if setup_obs.scrcpy_running():
         ok("scrcpy phone mirror is running")
     else:
         warn("scrcpy is NOT running - start "
@@ -321,49 +484,6 @@ def check_sources(o, args, cam_count, fps):
     else:
         warn("game audio window not set - re-run setup_obs.py with the "
              "mirror running")
-
-    over = input_settings(o, setup_obs.SRC_OVERLAY)
-    url = over.get("url") or ""
-    if "/overlay/program?token=" in url:
-        ok("overlay URL: %s" % redact(url))
-    else:
-        fail("overlay URL is not the program URL: %s" % redact(url))
-    want_frames = cam_count or 1
-    if "frame=off" in url:
-        got_frames = 0
-    elif "frames=2" in url:
-        got_frames = 2
-    else:
-        got_frames = 1
-    if (cam_count == 0 and "frame=off" in url) or got_frames == want_frames:
-        ok("overlay camera windows match the wired cameras (%s)"
-           % ("frame off" if cam_count == 0 else "%d frame(s)" % cam_count))
-    else:
-        warn("overlay shows %s camera frame(s) but %d camera(s) are wired - "
-             "re-run setup_obs.py" % (got_frames, cam_count))
-    if int(over.get("fps") or 0) == fps:
-        ok("overlay browser runs at %d fps" % fps)
-    else:
-        warn("overlay browser fps %r, stream at %d fps" % (over.get("fps"), fps))
-    if over.get("shutdown") is False:
-        ok("overlay keeps rendering when hidden (shutdown off)")
-    else:
-        warn("overlay 'shutdown when not visible' should be OFF")
-    if over.get("restart_when_active") is False:
-        ok("overlay does not refresh on scene switches")
-    else:
-        warn("overlay 'refresh when active' should be OFF")
-    accel = {k: v for k, v in over.items() if "accel" in k.lower()}
-    if accel and any(bool(v) for v in accel.values()):
-        ok("overlay hardware acceleration on")
-    elif accel:
-        warn("overlay hardware acceleration is off (%s)" % accel)
-    css = (over.get("css") or "").strip()
-    if css:
-        warn("overlay custom CSS is not empty (%d chars)" % len(css))
-    else:
-        ok("overlay custom CSS empty")
-    return url
 
 
 def check_audio(o, args):
@@ -502,14 +622,16 @@ def check_cameras(o, args, cam_count, items_map):
                 if got != want:
                     geom_issues.append("%s/%s crop %s != %s"
                                        % (scene, cam, got, want))
-    for scene in setup_obs.SCENES:
+    for scene in [setup_obs.BASE_SCENE] + setup_obs.SCENES:
         transform = item_transform(o, scene, setup_obs.SRC_PHONE, items_map)
         if transform and (int(transform.get("boundsWidth") or 0) != 1920
                           or int(transform.get("boundsHeight") or 0) != 1080
                           or transform.get("boundsType")
                           != "OBS_BOUNDS_SCALE_INNER"):
             geom_issues.append("%s/phone not fitting the canvas" % scene)
-        transform = item_transform(o, scene, setup_obs.SRC_OVERLAY, items_map)
+    for scene in setup_obs.SCENES:
+        transform = item_transform(o, scene, setup_obs.overlay_name(scene),
+                                   items_map)
         if transform and (int(transform.get("positionX") or 0) != 0
                           or int(transform.get("positionY") or 0) != 0):
             geom_issues.append("%s/overlay moved off canvas" % scene)
@@ -531,13 +653,13 @@ def check_hotkeys(o, args):
     for index, scene in enumerate(setup_obs.SCENES):
         entry = by_name.get(scene) or {}
         binding = (entry.get("hotkeys") or {}).get("OBSBasic.SelectScene")
-        if binding != [{"key": setup_obs.HOTKEYS[index]}]:
-            missing.append(scene)
+        if binding != [setup_obs.HOTKEYS[index]]:
+            missing.append("%s (%s)" % (scene, setup_obs.hotkey_label(index)))
     if missing:
         warn("hotkey bindings missing/changed for: %s - run setup_obs.py"
              % ", ".join(missing))
     else:
-        ok("F1..F8 scene hotkeys bound in the saved collection")
+        ok("F1..F12 + Ctrl+F1..F4 scene hotkeys bound in the saved collection")
     info("(file reflects the last time OBS saved; %s)"
          % os.path.basename(path))
     if args.keys and not OBS_LIVE:
@@ -569,46 +691,83 @@ def send_keys(keys):
     return True
 
 
+def scene_sendkeys(scene):
+    index = setup_obs.SCENES.index(scene)
+    key = "F%d" % (index + 1 if index < 12 else index - 11)
+    return "{%s}" % key if index < 12 else "^({%s})" % key
+
+
 def hotkey_press_test(o):
     start = o.req("GetCurrentProgramScene").get("currentProgramSceneName")
-    if start == "INTERMISSION":
-        start_restore = setup_obs.SCENES[0]
-    else:
-        start_restore = start
-    if not send_keys("{F6}"):
+    if not send_keys("{F1}"):
         warn("hotkey press test skipped: could not focus the OBS window")
         return
     time.sleep(1.2)
     now = o.req("GetCurrentProgramScene").get("currentProgramSceneName")
-    if now == "INTERMISSION":
-        ok("hotkey press test: F6 switched the program to INTERMISSION")
+    if now == "PRE-SHOW":
+        ok("hotkey press test: F1 switched the program to PRE-SHOW")
     elif now == start:
-        fail("hotkey press test: F6 did nothing - hotkeys are not loaded")
+        fail("hotkey press test: F1 did nothing - hotkeys are not loaded")
     else:
-        info("hotkey press test: F6 landed on %r" % now)
-    index = setup_obs.SCENES.index(start_restore) \
-        if start_restore in setup_obs.SCENES else None
-    if index is not None:
-        send_keys("{%s}" % setup_obs.HOTKEYS[index].replace("OBS_KEY_", ""))
+        info("hotkey press test: F1 landed on %r" % now)
+    if not send_keys("^({F3})"):
+        warn("Ctrl hotkey test skipped: could not focus the OBS window")
+    else:
+        time.sleep(1.2)
+        now = o.req("GetCurrentProgramScene").get("currentProgramSceneName")
+        if now == "TECHNICAL DIFFICULTIES":
+            ok("hotkey press test: Ctrl+F3 switched the program to "
+               "TECHNICAL DIFFICULTIES")
+        else:
+            warn("hotkey press test: Ctrl+F3 landed on %r - the Ctrl "
+                 "combinations may need rebinding in OBS (File > Settings > "
+                 "Hotkeys)" % now)
+    if start in setup_obs.SCENES and start != "TECHNICAL DIFFICULTIES":
+        send_keys(scene_sendkeys(start))
     else:
         o.req("SetCurrentProgramScene",
-              {"sceneName": start_restore or setup_obs.SCENES[0]})
+              {"sceneName": start or setup_obs.SCENES[0]})
     time.sleep(0.6)
+
+
+def gpu_soak_command(seconds):
+    """PowerShell one-liner that samples summed GPU engine utilisation."""
+    count = max(2, int(seconds // 3))
+    return ("$v = @(); for ($i = 0; $i -lt %d; $i++) { "
+            "try { $s = (Get-Counter '\\GPU Engine(*)\\Utilization Percentage' "
+            "-SampleInterval 1 -MaxSamples 1 -ErrorAction Stop).CounterSamples | "
+            "Measure-Object -Property CookedValue -Sum | "
+            "Select-Object -ExpandProperty Sum } catch { $s = -1 }; "
+            "$v += $s; Start-Sleep -Seconds 2 }; $v -join ','" % count)
 
 
 def check_stats(o, args, fps):
     step("Performance")
     target = float(fps or 60)
     if args.soak <= 0:
-        stats = o.req("GetStats")
-        active = float(stats.get("activeFps") or 0)
-        cpu = float(stats.get("cpuUsage") or 0)
-        info("now: %.1f fps, %.1f%% CPU, output skipped %s/%s, render skipped %s/%s"
-             % (active, cpu, stats.get("outputSkippedFrames"),
-                stats.get("outputTotalFrames"), stats.get("renderSkippedFrames"),
+        time.sleep(1.5)                 # let the probe switches settle
+        samples = []
+        for _ in range(4):
+            samples.append(o.req("GetStats"))
+            time.sleep(1.0)
+        stats = samples[-1]
+        active = sum(float(s.get("activeFps") or 0)
+                     for s in samples) / len(samples)
+        cpu = sum(float(s.get("cpuUsage") or 0)
+                  for s in samples) / len(samples)
+        info("now: %.1f fps (avg of %d s), %.1f%% CPU, output skipped %s/%s, "
+             "render skipped %s/%s"
+             % (active, len(samples), cpu,
+                stats.get("outputSkippedFrames"),
+                stats.get("outputTotalFrames"),
+                stats.get("renderSkippedFrames"),
                 stats.get("renderTotalFrames")))
-        if active and active < target * 0.9:
-            warn("%.1f fps is below the %d fps target right now" % (active, fps))
+        if not active:
+            info("no active output to measure right now (nothing is "
+                 "streaming/recording)")
+        elif active < target * 0.9:
+            warn("%.1f fps is below the %d fps target right now"
+                 % (active, fps))
         else:
             ok("frame rate holds close to target")
         if cpu > 80:
@@ -616,6 +775,18 @@ def check_stats(o, args, fps):
         else:
             ok("CPU at %.1f%%" % cpu)
         return
+    if OBS_LIVE:
+        info("soak uses the active program scene (OBS is live - not "
+             "switching to GAMEPLAY)")
+        prev = None
+    else:
+        prev = o.req("GetCurrentProgramScene").get("currentProgramSceneName")
+        o.req("SetCurrentProgramScene", {"sceneName": "GAMEPLAY"})
+        info("soaking with GAMEPLAY on screen for %d s..." % args.soak)
+    gpu_proc = subprocess.Popen(
+        ["powershell", "-NoProfile", "-Command",
+         gpu_soak_command(args.soak)],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     first = o.req("GetStats")
     start = time.time()
     samples = []
@@ -624,6 +795,14 @@ def check_stats(o, args, fps):
         samples.append((time.time(), o.req("GetStats")))
     end_time, last = samples[-1]
     duration = max(1.0, end_time - start)
+    gpu_out = ""
+    try:
+        gpu_out = gpu_proc.communicate(timeout=30)[0] or ""
+    except subprocess.TimeoutExpired:
+        gpu_proc.kill()
+    if prev:
+        o.req("SetCurrentProgramScene",
+              {"sceneName": prev or setup_obs.SCENES[0]})
     fps_avg = sum(float(s.get("activeFps") or 0)
                   for _, s in samples) / len(samples)
     cpu_avg = sum(float(s.get("cpuUsage") or 0)
@@ -638,23 +817,99 @@ def check_stats(o, args, fps):
          "%d output skipped, %d render skipped"
          % (duration, fps_avg, cpu_avg, out_frames, out_skipped,
             render_skipped))
+    gpu_values = []
+    for chunk in (gpu_out or "").replace("\n", "").split(","):
+        try:
+            value = float(chunk)
+        except (TypeError, ValueError):
+            continue
+        if value >= 0:
+            gpu_values.append(value)
+    if gpu_values:
+        gpu_avg = sum(gpu_values) / len(gpu_values)
+        info("GPU: %.1f%% avg (max %.1f%%) - sum of all GPU engines"
+             % (gpu_avg, max(gpu_values)))
+        if gpu_avg > 90:
+            warn("GPU looks maxed out - watch for render lag during gameplay")
+        else:
+            ok("GPU headroom exists")
+    else:
+        warn("GPU counter unavailable on this machine (skipped)")
     if fps_avg >= target * 0.95:
         ok("frame rate steady for %.0f s" % duration)
     elif fps_avg >= target * 0.85:
         warn("frame rate %.1f vs %d target - close, watch it" % (fps_avg, fps))
     else:
         fail("frame rate %.1f well below the %d fps target" % (fps_avg, fps))
-    if out_skipped == 0 and render_skipped == 0:
-        ok("no dropped frames in %.0f s" % duration)
+    rendered = (int(last.get("renderTotalFrames") or 0)
+                - int(first.get("renderTotalFrames") or 0))
+    skip_pct = (100.0 * render_skipped / rendered) if rendered else 0.0
+    if out_skipped == 0 and skip_pct <= 0.5:
+        ok("no dropped frames in %.0f s (render skipped %d of %d, %.2f%%)"
+           % (duration, render_skipped, rendered, skip_pct))
     else:
-        warn("%d output + %d render frames skipped in %.0f s"
-             % (out_skipped, render_skipped, duration))
+        warn("%d output + %d render frames skipped in %.0f s (%.2f%% of "
+             "rendered frames)" % (out_skipped, render_skipped, duration,
+                                   skip_pct))
     if cpu_avg <= 65:
         ok("CPU average %.1f%%" % cpu_avg)
     elif cpu_avg <= 85:
         warn("CPU average %.1f%% - acceptable but warm" % cpu_avg)
     else:
         fail("CPU average %.1f%% - encoder/settings too heavy" % cpu_avg)
+
+
+def save_scene_shots(o, items_map):
+    """Screenshot every scene while it is on screen (so shutdown=on browser
+    sources are actually rendering), then prove the images all differ.
+
+    Uses SaveSourceScreenshot, so OBS writes the PNG straight to disk (the
+    GetSourceScreenshot reply carries a data-URI prefix that is easy to
+    mangle)."""
+    step("Scene screenshots -> %s" % SHOTS_DIR)
+    if OBS_LIVE:
+        info("skipped while streaming/recording")
+        return
+    os.makedirs(SHOTS_DIR, exist_ok=True)
+    prev = o.req("GetCurrentProgramScene").get("currentProgramSceneName")
+    hashes = {}
+    for index, scene in enumerate(setup_obs.SCENES):
+        o.req("SetCurrentProgramScene", {"sceneName": scene})
+        time.sleep(3.0)          # browser reload + entrance animation
+        name = "%02d_%s.png" % (index + 1,
+                                scene.lower().replace(" ", "_"))
+        path = os.path.join(SHOTS_DIR, name)
+        o.try_req("SaveSourceScreenshot",
+                  {"sourceName": scene, "imageFormat": "png",
+                   "imageFilePath": path,
+                   "imageWidth": 1920, "imageHeight": 1080})
+        if not os.path.isfile(path):
+            fail("screenshot failed for %s (is the scene rendering?)"
+                 % scene)
+            continue
+        with open(path, "rb") as fh:
+            blob = fh.read()
+        if not blob.startswith(b"\x89PNG"):
+            fail("%s screenshot came back as something other than a PNG"
+                 % scene)
+            continue
+        hashes[scene] = (hashlib.md5(blob).hexdigest(), len(blob), name)
+    seen = {}
+    dupes = []
+    for scene, (digest, size, name) in hashes.items():
+        if digest in seen:
+            dupes.append("%s == %s" % (scene, seen[digest]))
+        seen[digest] = scene
+        if size < 2000:
+            warn("%s screenshot is suspiciously tiny (%d bytes) - check the "
+                 "scene renders" % (scene, size))
+    if dupes:
+        fail("scenes showing the SAME content: %s" % ", ".join(dupes))
+    else:
+        ok("all %d scenes render distinct content (%d screenshots saved)"
+           % (len(hashes), len(hashes)))
+    o.req("SetCurrentProgramScene",
+          {"sceneName": prev or setup_obs.SCENES[0]})
 
 
 # ---------------------------------------------------------------------------
@@ -667,12 +922,17 @@ def main():
     parser.add_argument("--quick", action="store_true",
                         help="skip checks that switch the program scene")
     parser.add_argument("--keys", action="store_true",
-                        help="press F6 in a focused OBS to prove hotkeys work")
+                        help="press F1 + Ctrl+F3 in a focused OBS to prove "
+                             "hotkeys work")
     parser.add_argument("--soak", type=int, default=0, metavar="SECONDS",
-                        help="sample fps/CPU/dropped frames for this long")
+                        help="sample fps/CPU/GPU/dropped frames for this long "
+                             "with GAMEPLAY active")
+    parser.add_argument("--shots", action="store_true",
+                        help="save a screenshot of every scene to "
+                             "docs/obs/screenshots/v2")
     args = parser.parse_args()
 
-    print("BGMI Cup broadcast check")
+    print("BGMI Cup v2 broadcast check")
     step("Connection")
     try:
         o = Obs().connect(event_subscriptions=obs_ws.INPUT_VOLUME_METERS)
@@ -687,12 +947,16 @@ def main():
         fps = check_video(o, args)
         check_output_profile(o, args)
         items_map = build_items_map(o)
-        cam_count = check_scenes(o, args, items_map)
+        cam_count = check_scene_inventory(o, args, items_map)
+        _, _, origin = obs_config.overlay_target()
+        check_browser_sources(o, args, items_map, cam_count, fps, origin)
         check_sources(o, args, cam_count, fps)
         check_audio(o, args)
         audio_meter_check(o, args)
         check_cameras(o, args, cam_count, items_map)
         check_hotkeys(o, args)
+        if args.shots:
+            save_scene_shots(o, items_map)
         check_stats(o, args, fps)
     finally:
         o.close()

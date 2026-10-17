@@ -104,7 +104,7 @@ class Obs:
         status = d.get("requestStatus") or {}
         code = status.get("code")
         if status.get("result") is True or code in ok_codes:
-            return d.get("requestData") or {}
+            return d.get("responseData") or {}
         raise ObsError(request_type, code, status.get("comment", ""))
 
     def try_req(self, request_type, request_data=None, ok_codes=(100,)):

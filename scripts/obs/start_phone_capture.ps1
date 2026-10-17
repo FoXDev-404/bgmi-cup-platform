@@ -81,8 +81,10 @@ if (-not $Test) {
     }
 }
 
-# Keep the screen on. scrcpy's own --stay-awake needs input control, which we
-# disable on purpose, so set the device-side USB stay-awake flag over adb.
+# Wake the screen if it fell asleep, then keep it on. scrcpy's own
+# --stay-awake needs input control, which we disable on purpose, so wake the
+# device and set the USB stay-awake flag over adb.
+& $adb -s $serial shell input keyevent KEYCODE_WAKEUP | Out-Null
 & $adb -s $serial shell svc power stayon usb | Out-Null
 
 $argList = @(

@@ -4,8 +4,9 @@ Uses websocket-client (Apache-2.0, pinned in requirements.txt) installed
 into the isolated venv at scripts/obs/.venv - the app itself stays
 stdlib-only.
 
-Only the request/response side of the protocol is implemented (event
-subscriptions are disabled in Identify; stray events are skipped).
+The request/response side is the default (event subscriptions off in
+Identify; stray events are skipped). Pass event_subscriptions to
+connect() when a caller needs events - pump_events() collects them.
 """
 from __future__ import annotations
 
@@ -19,6 +20,9 @@ import uuid
 import websocket
 
 import obs_config
+
+# obs-websocket v5 event subscription flags (subset we use)
+INPUT_VOLUME_METERS = 1 << 16
 
 
 class ObsError(RuntimeError):
@@ -39,14 +43,15 @@ class Obs:
         self._ws = None
 
     # -- connection ---------------------------------------------------------
-    def connect(self):
+    def connect(self, event_subscriptions=0):
         self._ws = websocket.create_connection(
             "ws://%s:%s" % (self.host, self.port), timeout=self.timeout)
         hello = json.loads(self._ws.recv())
         if hello.get("op") != 0:
             raise ObsError("Hello", -1, "unexpected first message from OBS")
         d = hello.get("d") or {}
-        identify = {"rpcVersion": 1, "eventSubscriptions": 0}
+        identify = {"rpcVersion": 1,
+                    "eventSubscriptions": int(event_subscriptions)}
         auth = d.get("authentication")
         if auth:
             secret = base64.b64encode(hashlib.sha256(
@@ -113,6 +118,43 @@ class Obs:
             return self.req(request_type, request_data, ok_codes)
         except ObsError:
             return None
+
+    # -- events -------------------------------------------------------------
+    def pump_events(self, seconds, limit=4096):
+        """Collect raw events (op 5 payloads) for `seconds`.
+
+        Only useful after connect(event_subscriptions=...); with
+        subscriptions off this simply collects nothing."""
+        collected = []
+        end = time.time() + max(0.0, float(seconds))
+        try:
+            old_timeout = self._ws.gettimeout()
+        except Exception:                    # pragma: no cover
+            old_timeout = None
+        try:
+            while time.time() < end and len(collected) < limit:
+                self._ws.settimeout(max(0.05, min(0.25, end - time.time())))
+                try:
+                    msg = self._ws.recv()
+                except websocket.WebSocketTimeoutException:
+                    continue
+                except Exception:
+                    break
+                if msg in (None, ""):
+                    break
+                try:
+                    data = json.loads(msg)
+                except ValueError:
+                    continue
+                if data.get("op") == 5:
+                    collected.append(data.get("d") or {})
+        finally:
+            if old_timeout is not None:
+                try:
+                    self._ws.settimeout(old_timeout)
+                except Exception:            # pragma: no cover
+                    pass
+        return collected
 
     # -- helpers ------------------------------------------------------------
     def screenshot(self, source_name, path, width=1920, height=1080,

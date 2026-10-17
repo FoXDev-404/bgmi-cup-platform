@@ -1,0 +1,6 @@
+# OBS tooling for the BGMI Cup broadcast (scripts/obs/).
+#
+# websocket-client: Apache-2.0, https://github.com/websocket-client/websocket-client
+# Used only by the setup/check scripts inside the isolated venv - the app
+# itself stays Python-stdlib-only. Install with scripts/obs/setup_env.ps1.
+websocket-client==1.9.2

@@ -28,6 +28,10 @@ opencode.json.bak-*
 __pycache__/
 *.pyc
 
+# OBS broadcast tooling (scripts/obs/) — isolated venv and local artifacts.
+/scripts/obs/.venv/
+/docs/obs/screenshots/
+
 # QA screenshots (the admin-queue one may capture team data).
 /qa-*.png
 /pw-*.png

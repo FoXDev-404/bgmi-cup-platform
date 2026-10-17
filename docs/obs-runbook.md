@@ -205,6 +205,7 @@ Table shorthand: `setup_obs.bat` = **`Setup\Rebuild OBS Setup.bat`**,
 
 | Symptom | Fix |
 |---|---|
+| OBS shows the old/default collection, not the 16 new scenes | That machine hasn't built the collection yet (a fresh clone shows whatever was there before) — run **`Setup\Rebuild OBS Setup.bat`** once; starting OBS alone cannot create the scenes. |
 | One scene's overlay blank / token error | `check_obs.bat` says which scene; usually the token was rotated → re-run `setup_obs.bat`. |
 | Wrong overlay on a scene | Someone edited URLs — re-run `setup_obs.bat` (it restores the canonical map) and `check_obs.bat` to confirm. |
 | Phone black/locked on stream | Org-managed device re-locks. Unlock it; then `adb shell input keyevent KEYCODE_WAKEUP` + `adb shell svc power stayon usb`; restart the mirror. |

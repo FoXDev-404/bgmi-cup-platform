@@ -9,6 +9,11 @@ if not exist "%OBS_DIR%\obs64.exe" (
   pause
   exit /b 1
 )
+if not exist "%APPDATA%\obs-studio\basic\scenes\BGMI_Cup_v2.json" (
+  echo [!] "BGMI Cup v2" is not built on this machine yet - OBS will show the
+  echo     old/default collection. Run "Rebuild OBS Setup.bat" from the
+  echo     Setup folder once first - it creates the 16 broadcast scenes.
+)
 tasklist /FI "IMAGENAME eq obs64.exe" | find /I "obs64.exe" >nul
 if not errorlevel 1 (
   echo OBS is already running.

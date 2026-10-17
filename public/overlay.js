@@ -7,6 +7,33 @@ let lastRenderedScene = null;
 // touching the live broadcast state, so any scene can be checked in a normal tab.
 const BROADCAST_STATES_PREVIEW=['pre-show','stream-start','countdown','caster','format','lineup','live','chicken-dinner','frag-leaders','results','overall','mvp','map-feed','intermission','technical-difficulties','hidden'];
 const PREVIEW_SCENE=(()=>{try{const v=new URLSearchParams(location.search).get('scene');if(v&&BROADCAST_STATES_PREVIEW.includes(v))return v;const seg=(location.pathname.split('/').pop()||'').toLowerCase();return seg&&BROADCAST_STATES_PREVIEW.includes(seg)?seg:''}catch{return ''}})();
+// Camera frames: geometry lives in /camera-frames.json (single source of truth
+// for this page and scripts/obs/setup_obs.py). ?frames=2 shows two camera
+// windows (one per caster), ?frame=off removes the punch-through window.
+const CAMERA_FRAME_COUNT=(()=>{try{return (new URLSearchParams(location.search).get('frames')||'').trim()==='2'?2:1}catch{return 1}})();
+const CAMERA_FRAME_OFF=(()=>{try{return (new URLSearchParams(location.search).get('frame')||'').trim().toLowerCase()==='off'}catch{return false}})();
+let cameraFramesConfig=null;
+function cameraFamily(stateName){return stateName==='caster'||stateName==='countdown'?'caster':stateName==='live'?'live':'';}
+function applyCameraFrames(stateName){
+  const root=$('broadcast');if(!root)return;
+  root.classList.toggle('frames-1',CAMERA_FRAME_COUNT===1);
+  root.classList.toggle('frames-2',CAMERA_FRAME_COUNT===2);
+  root.classList.toggle('frame-off',CAMERA_FRAME_OFF);
+  const family=cameraFamily(stateName);if(!family||!cameraFramesConfig)return;
+  const layout=cameraFramesConfig.layouts&&cameraFramesConfig.layouts[`${family}-${CAMERA_FRAME_COUNT}`];
+  const frames=layout&&Array.isArray(layout.frames)?layout.frames:[];
+  const prefixes=family==='caster'?['--cam','--cam2']:['--livcam','--livcam2'];
+  frames.slice(0,2).forEach((frame,index)=>{
+    if(!frame)return;
+    const prefix=prefixes[index];
+    root.style.setProperty(`${prefix}-x`,`${Number(frame.x)||0}px`);
+    root.style.setProperty(`${prefix}-y`,`${Number(frame.y)||0}px`);
+    root.style.setProperty(`${prefix}-w`,`${Number(frame.w)||0}px`);
+    root.style.setProperty(`${prefix}-h`,`${Number(frame.h)||0}px`);
+  });
+}
+fetch('/camera-frames.json',{cache:'no-store'}).then(response=>response.ok?response.json():null).then(config=>{if(config&&config.layouts){cameraFramesConfig=config;if(lastRenderedScene)applyCameraFrames(lastRenderedScene);}}).catch(()=>{});
+applyCameraFrames(null);
 let overallPage = 0;
 let sceneWipeTimer = null;
 let loadedThemeUrl = '';
@@ -81,7 +108,7 @@ function render(data) {
   const stateName=PREVIEW_SCENE||data.broadcastState||'live';
   const sceneChanged=lastRenderedScene!==stateName;
   if(sceneChanged){if(stateName==='results'||stateName==='overall')overallPage=0;if(stateName==='lineup')lineupPage=0;if(lastRenderedScene!==null)playCinematicTransition(stateName);}
-  $('broadcast').className=`broadcast state-${stateName}`;lastRenderedScene=stateName;syncThemeMusic(data,stateName);
+  $('broadcast').className=`broadcast state-${stateName}`;lastRenderedScene=stateName;applyCameraFrames(stateName);syncThemeMusic(data,stateName);
   $('streamStartEventName').textContent=data.tournamentName||'BGMI COLLEGE CHAMPIONSHIP';$('streamStartFormat').textContent=data.format||'TOURNAMENT SERIES';$('streamStartOrganizer').textContent=data.organizer||'ESPORTS OPERATIONS';$('formatEventSmall').textContent=data.tournamentName||'BGMI BROADCAST';$('formatName').textContent=data.format||'TOURNAMENT SERIES';$('formatOrganizer').textContent=data.organizer||'ESPORTS OPERATIONS';$('formatGroupCount').textContent=`${Math.max(1,Math.ceil((data.teams||[]).length/16))} GROUPS`;$('formatSemiSlots').textContent=`${data.qualification?.semifinalSlots||24} TEAMS`;$('formatFinalSlots').textContent=`${data.qualification?.finalSlots||16} TEAMS`;$('formatMatchMeta').textContent=`MATCH ${String(data.currentMatch||1).padStart(2,'0')} · ${data.currentGroup||'GROUP A'}`;$('streamStartMatchLabel').textContent=`MATCH ${String(data.currentMatch||1).padStart(2,'0')} · ${data.currentMap||'ERANGEL'}`;$('lineupSubtitle').textContent=`MATCH ${String(data.currentMatch||1).padStart(2,'0')} · ${data.currentGroup||'GROUP A'} · ${data.currentMap||'ERANGEL'}`;$('lineupEventMark').textContent=data.tournamentName||'BGMI ESPORTS';
   const logoUrl=data.production?.eventLogoUrl||'';setImage('streamEventLogo','streamLogoFallback',logoUrl,initials(data.tournamentName||'BG'));
   const prod=data.production||{};const phase=String(data.currentGroup||'A');const automaticGroup=/^[A-F]$/.test(phase)?`GROUP ${phase}`:phase;
@@ -200,7 +227,7 @@ function renderWinnerPanel(data){
   });
 }
 function renderTopFragger(data){const player=data.playerStats?.overallTopFragger;if(!player||!player.kills){$('topFragger').classList.add('empty');$('topFraggerName').textContent='Awaiting frags';$('topFraggerTeam').textContent='OVERALL LEADERBOARD';$('topFraggerKills').textContent='0';setImage('topFraggerPhoto','topFraggerInitials','', '•');setTeamLogo($('topFraggerTeamLogo'),'','TEAM');return;}$('topFragger').classList.remove('empty');$('topFraggerName').textContent=player.playerName;$('topFraggerTeam').textContent=player.teamName;$('topFraggerKills').textContent=player.kills;setImage('topFraggerPhoto','topFraggerInitials',player.avatarUrl,initials(player.playerName));setTeamLogo($('topFraggerTeamLogo'),player.teamLogo,player.teamName);}
-function renderProduction(data){const prod=data.production||{};const caster=prod.caster||{};$('casterName').textContent=caster.name||'MAIN CASTER';$('casterTagline').textContent=caster.tagline||'THE BATTLE STARTS NOW';setImage('casterPhoto','casterInitials',caster.imageUrl,initials(caster.name||'MC'));const mode=prod.mvpMode==='overall'?'overall':'match';const player=mode==='overall'?data.playerStats?.overallTopFragger:data.playerStats?.matchMvp;const team=(data.teams||[]).find(t=>t.id===player?.teamId);$('mvpEyebrow').textContent=mode==='overall'?'OVERALL TOP FRAGGER':'CURRENT MATCH MVP';$('mvpOverline').textContent=mode==='overall'?'TOURNAMENT FRAG LEADER':'MOST VALUABLE PLAYER';$('mvpModeLabel').textContent=mode==='overall'?'OVERALL LEADERBOARD':'CURRENT MATCH MVP';$('mvpName').textContent=player?.playerName||'AWAITING FRAGS';$('mvpTeam').textContent=player?.teamName||'Player spotlight';$('mvpKills').textContent=player?.kills||0;$('mvpMatches').textContent=`MATCH ${String(data.currentMatch||1).padStart(2,'0')}`;setImage('mvpPhoto','mvpInitials',player?.avatarUrl,initials(player?.playerName||'MVP'));const logo=$('mvpTeamLogo');if(player?.teamLogo||team?.logo){logo.src=player?.teamLogo||team?.logo;logo.classList.remove('hidden');logo.onerror=()=>logo.classList.add('hidden')}else{logo.removeAttribute('src');logo.classList.add('hidden')}}
+function renderProduction(data){const prod=data.production||{};const caster=prod.caster||{};$('casterName').textContent=caster.name||'MAIN CASTER';$('casterTagline').textContent=caster.tagline||'THE BATTLE STARTS NOW';setImage('casterPhoto','casterInitials',caster.imageUrl,initials(caster.name||'MC'));const casterName1=caster.name||'CASTER 1',casterName2=caster.name2||'CASTER 2';[['rigCamName1',casterName1],['liveCamName1',casterName1],['rigCamName2',casterName2],['liveCamName2',casterName2]].forEach(([id,text])=>{const el=$(id);if(el)el.textContent=text});const mode=prod.mvpMode==='overall'?'overall':'match';const player=mode==='overall'?data.playerStats?.overallTopFragger:data.playerStats?.matchMvp;const team=(data.teams||[]).find(t=>t.id===player?.teamId);$('mvpEyebrow').textContent=mode==='overall'?'OVERALL TOP FRAGGER':'CURRENT MATCH MVP';$('mvpOverline').textContent=mode==='overall'?'TOURNAMENT FRAG LEADER':'MOST VALUABLE PLAYER';$('mvpModeLabel').textContent=mode==='overall'?'OVERALL LEADERBOARD':'CURRENT MATCH MVP';$('mvpName').textContent=player?.playerName||'AWAITING FRAGS';$('mvpTeam').textContent=player?.teamName||'Player spotlight';$('mvpKills').textContent=player?.kills||0;$('mvpMatches').textContent=`MATCH ${String(data.currentMatch||1).padStart(2,'0')}`;setImage('mvpPhoto','mvpInitials',player?.avatarUrl,initials(player?.playerName||'MVP'));const logo=$('mvpTeamLogo');if(player?.teamLogo||team?.logo){logo.src=player?.teamLogo||team?.logo;logo.classList.remove('hidden');logo.onerror=()=>logo.classList.add('hidden')}else{logo.removeAttribute('src');logo.classList.add('hidden')}}
 function renderMapFeed(data){const url=data.production?.mapFeed?.imageUrl;const img=$('mapFeedImage'),placeholder=$('mapPlaceholder');if(url){img.onerror=()=>{img.classList.add('hidden');placeholder.classList.remove('hidden')};img.src=url;img.classList.remove('hidden');placeholder.classList.add('hidden')}else{img.removeAttribute('src');img.classList.add('hidden');placeholder.classList.remove('hidden')}}
 function tickCountdown(){if(!lastState)return;const end=Number(lastState.production?.countdownEndsAt)||0;const remain=end?Math.max(0,Math.ceil((end-Date.now())/1000)):0;$('countdownClock').textContent=String(remain).padStart(2,'0');$('countdownClock').classList.toggle('final-seconds',remain>0&&remain<=5);$('matchCountdownCornerClock').textContent=`00:${String(remain).padStart(2,'0')}`;$('matchCountdownCornerClock').classList.toggle('final-seconds',remain>0&&remain<=5);$('matchCountdownCornerLabel').textContent=`MATCH ${String(lastState.currentMatch||1).padStart(2,'0')} · ${lastState.currentMap||'ERANGEL'}`;}
 function tickStreamStart(){if(!lastState)return;const end=Number(lastState.production?.streamStartEndsAt)||0;const remain=end?Math.max(0,Math.ceil((end-Date.now())/1000)):Math.max(0,Number(lastState.production?.streamStartDurationSeconds)||1200);const mins=Math.floor(remain/60),secs=remain%60;$('streamStartClock').textContent=`${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;$('streamStartClock').classList.toggle('final-seconds',remain>0&&remain<=60);}

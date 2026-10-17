@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "canvas": { "width": 1920, "height": 1080 },
+  "note": "Single source of truth for camera window geometry. x/y/w/h are pixels on the 1920x1080 broadcast canvas. overlay.js paints the transparent punch-through frames from this file; scripts/obs/setup_obs.py positions the OBS camera sources on the same numbers. Change a number here, then rerun setup_obs.py and reload the overlay in OBS.",
+  "layouts": {
+    "caster-1": {
+      "label": "Caster shot - one camera",
+      "frames": [{ "x": 176, "y": 210, "w": 450, "h": 660 }]
+    },
+    "caster-2": {
+      "label": "Caster shot - two cameras (one frame per caster)",
+      "frames": [
+        { "x": 176, "y": 320, "w": 300, "h": 440 },
+        { "x": 504, "y": 320, "w": 300, "h": 440 }
+      ]
+    },
+    "live-1": {
+      "label": "Gameplay - one camera, top right",
+      "frames": [{ "x": 1392, "y": 44, "w": 480, "h": 270 }]
+    },
+    "live-2": {
+      "label": "Gameplay - two cameras, top right",
+      "frames": [
+        { "x": 1148, "y": 44, "w": 352, "h": 198 },
+        { "x": 1520, "y": 44, "w": 352, "h": 198 }
+      ]
+    }
+  }
+}

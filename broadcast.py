@@ -1625,6 +1625,7 @@ def legacy_state(conn):
             "eventLogoUrl": get_bsetting(conn, "logo_path", ""),
             "themeMusicUrl": "", "mapFeed": {"imageUrl": ""},
             "caster": {"name": get_bsetting(conn, "caster_name", ""),
+                       "name2": get_bsetting(conn, "caster2_name", ""),
                        "tagline": get_bsetting(conn, "caster_tagline", ""),
                        "imageUrl": get_bsetting(conn, "caster_image", "")},
             "mvpMode": "match", "countdownEndsAt": 0, "streamStartEndsAt": 0,

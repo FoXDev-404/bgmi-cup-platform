@@ -399,6 +399,21 @@
             >MC</span
           >
         </div>
+        <!-- Second caster camera (two-cam mode): its own transparent window,
+             switched on by the frames-2 class from camera-frames.json. -->
+        <div
+          class="caster-photo-wrap caster-photo-wrap-second"
+          id="casterPhotoWrap2"
+        >
+          <span id="casterInitials2">C2</span>
+        </div>
+        <div class="cam-corners-second" id="camCorners2" aria-hidden="true"></div>
+        <div class="cam-plate cam-plate-rig" id="rigPlate1">
+          <b id="rigCamName1">CASTER 1</b><small>CAM 01 · LIVE</small>
+        </div>
+        <div class="cam-plate cam-plate-rig" id="rigPlate2">
+          <b id="rigCamName2">CASTER 2</b><small>CAM 02 · LIVE</small>
+        </div>
         <div class="caster-copy">
           <span class="eyebrow">LIVE COMMENTARY · MATCH HOST</span>
           <h1 id="casterName">MAIN CASTER</h1>
@@ -408,6 +423,18 @@
           </div>
         </div>
         <div class="caster-stamp">BROADCAST<br /><b>LIVE</b></div>
+      </section>
+      <!-- Gameplay camera windows (top-right, clear of the in-game HUD):
+           the OBS camera sources sit exactly under these frames. -->
+      <section class="live-cams" id="liveCams" aria-hidden="true">
+        <div class="live-cam-window" id="liveCamWrap1"></div>
+        <div class="live-cam-window" id="liveCamWrap2"></div>
+        <div class="cam-plate cam-plate-live" id="livePlate1">
+          <b id="liveCamName1">CASTER 1</b><small>CAM 01</small>
+        </div>
+        <div class="cam-plate cam-plate-live" id="livePlate2">
+          <b id="liveCamName2">CASTER 2</b><small>CAM 02</small>
+        </div>
       </section>
       <section class="mvp-panel" id="mvpPanel">
         <div class="mvp-kicker">

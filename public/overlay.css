@@ -6363,3 +6363,251 @@ body {
     max-height: 50px;
   }
 }
+
+/* ==========================================================================
+   Camera frames — geometry source of truth: /camera-frames.json
+   --------------------------------------------------------------------------
+   overlay.js reads the json and sets --cam-*/--cam2-* (caster + countdown
+   rig, one window per caster) and --livcam-*/--livcam2-* (gameplay windows,
+   top right), then toggles .frames-1 / .frames-2 / .frame-off on #broadcast.
+   scripts/obs/setup_obs.py places the OBS camera sources on exactly the same
+   numbers, so the punch-through windows line up pixel for pixel.
+   URL options on any overlay page: ?frames=2 (two cameras) and ?frame=off
+   (no camera: the window is not punched, the frame dressing is hidden).
+   The :root values below are fallbacks matching camera-frames.json.
+   ========================================================================== */
+:root {
+  /* caster rig, one camera (caster-1) */
+  --cam-x: 176px;
+  --cam-y: 210px;
+  --cam-w: 450px;
+  --cam-h: 660px;
+  /* caster rig, second camera (caster-2) */
+  --cam2-x: 504px;
+  --cam2-y: 320px;
+  --cam2-w: 300px;
+  --cam2-h: 440px;
+  /* gameplay windows, top right (live-1 / live-2) */
+  --livcam-x: 1392px;
+  --livcam-y: 44px;
+  --livcam-w: 480px;
+  --livcam-h: 270px;
+  --livcam2-x: 1520px;
+  --livcam2-y: 44px;
+  --livcam2-w: 352px;
+  --livcam2-h: 198px;
+}
+/* Second caster window: same dressing as the first, moved by --cam2-*. */
+.state-caster .caster-photo-wrap-second,
+.state-countdown .caster-photo-wrap-second {
+  left: var(--cam2-x);
+  top: var(--cam2-y);
+  width: var(--cam2-w);
+  height: var(--cam2-h);
+}
+.state-caster #casterInitials2,
+.state-countdown #casterInitials2 {
+  display: none;
+}
+/* In two-cam mode the name block clears the second window, not the first. */
+.state-caster.frames-2 .caster-copy,
+.state-countdown.frames-2 .caster-copy {
+  left: calc(var(--cam2-x) + var(--cam2-w) + clamp(28px, 6vw, 110px));
+}
+/* A photo never covers the camera in the punch modes; frame-off hides the
+   window itself, so the photo would not show anyway. */
+.state-caster .caster-photo-wrap img,
+.state-countdown .caster-photo-wrap img {
+  display: none;
+}
+/* Notched-corner repaint for the second window (same trick as the first on
+   #casterPanel::before/::after, driven by --cam2-*). */
+.cam-corners-second {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: none;
+}
+.broadcast.frames-2 .cam-corners-second {
+  display: block;
+}
+.cam-corners-second::before,
+.cam-corners-second::after {
+  content: "";
+  position: absolute;
+  background: linear-gradient(135deg, #1d1b12, #0a0c09);
+}
+.cam-corners-second::before {
+  left: calc(var(--cam2-x) + var(--cam2-w) * 0.88);
+  top: var(--cam2-y);
+  width: calc(var(--cam2-w) * 0.12 + 1px);
+  height: calc(var(--cam2-h) * 0.12 + 1px);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.cam-corners-second::after {
+  left: calc(var(--cam2-x) - 1px);
+  top: calc(var(--cam2-y) + var(--cam2-h) * 0.88 - 1px);
+  width: calc(var(--cam2-w) * 0.12 + 2px);
+  height: calc(var(--cam2-h) * 0.12 + 2px);
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+}
+/* Two holes: layer 1 keeps everything, each further layer is excluded
+   (mask-composite cycles per layer; the first entry is ignored). */
+.state-caster.frames-2 .caster-background,
+.state-countdown.frames-2 .caster-background,
+.state-caster.frames-2 .operator-backplate,
+.state-countdown.frames-2 .operator-backplate,
+.state-caster.frames-2 #casterPanel::before,
+.state-countdown.frames-2 #casterPanel::before,
+.state-caster.frames-2 #casterPanel::after,
+.state-countdown.frames-2 #casterPanel::after {
+  mask-image:
+    linear-gradient(#000 0 0), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  mask-size: 100% 100%, var(--cam-w) var(--cam-h), var(--cam2-w) var(--cam2-h);
+  mask-position: 0 0, var(--cam-x) var(--cam-y), var(--cam2-x) var(--cam2-y);
+  mask-repeat: no-repeat;
+  mask-composite: exclude, exclude, exclude;
+}
+.state-caster.frames-2 .motion-arsenal,
+.state-countdown.frames-2 .motion-arsenal {
+  mask-image:
+    radial-gradient(ellipse at 50% 50%, transparent 0%, rgba(0, 0, 0, 0.03) 25%, rgba(0, 0, 0, 0.45) 48%, #000 82%),
+    linear-gradient(#000 0 0),
+    linear-gradient(#000 0 0),
+    linear-gradient(#000 0 0);
+  mask-size: 100% 100%, 100% 100%, var(--cam-w) var(--cam-h), var(--cam2-w) var(--cam2-h);
+  mask-position: 0 0, 0 0, var(--cam-x) var(--cam-y), var(--cam2-x) var(--cam2-y);
+  mask-repeat: no-repeat;
+  mask-composite: intersect, exclude, exclude, add;
+}
+/* One camera per caster: hide the second window / plate / dress element. */
+.broadcast.frames-1 #liveCamWrap2,
+.broadcast.frames-1 #livePlate2,
+.broadcast.frames-1 .caster-photo-wrap-second,
+.broadcast.frames-1 #rigPlate2 {
+  display: none !important;
+}
+.broadcast.frames-1 .cam-corners-second {
+  display: none;
+}
+/* Name plates under each window. */
+.cam-plate {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 12px 6px;
+  pointer-events: none;
+  text-align: center;
+  background: linear-gradient(180deg, #10110be6, #070806b3 62%, transparent);
+  border-top: 1px solid #ffbd3659;
+  text-transform: uppercase;
+}
+.cam-plate b {
+  font: 800 clamp(11px, 0.95vw, 18px) var(--display);
+  letter-spacing: 2px;
+  color: #ffca48;
+  line-height: 1;
+}
+.cam-plate small {
+  font: 800 clamp(7px, 0.5vw, 9px) var(--mono);
+  letter-spacing: 1.8px;
+  color: #b9b39b;
+}
+.cam-plate-rig {
+  z-index: 3;
+  top: calc(var(--cam-y) + var(--cam-h) + 10px);
+  left: var(--cam-x);
+  width: var(--cam-w);
+}
+#rigPlate2 {
+  top: calc(var(--cam2-y) + var(--cam2-h) + 10px);
+  left: var(--cam2-x);
+  width: var(--cam2-w);
+}
+/* Gameplay camera windows (state-live only; the phone keeps every pixel of
+   in-game HUD left of the top-right corner — see docs/obs-runbook.md). */
+.live-cams {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  display: none;
+}
+.state-live .live-cams {
+  display: block;
+}
+.live-cam-window {
+  position: absolute;
+  border: 1px solid #c08a2e;
+  box-shadow:
+    inset 0 0 0 1px #05060acc,
+    inset 0 0 26px #0000004d,
+    0 18px 60px #0008,
+    0 0 0 6px #ffbd360a;
+}
+.live-cam-window::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  pointer-events: none;
+  background:
+    linear-gradient(#ffb725, #ffb725) left top / 26px 2px no-repeat,
+    linear-gradient(#ffb725, #ffb725) left top / 2px 26px no-repeat,
+    linear-gradient(#ffb725, #ffb725) right bottom / 26px 2px no-repeat,
+    linear-gradient(#ffb725, #ffb725) right bottom / 2px 26px no-repeat;
+  filter: drop-shadow(0 0 5px #ffb7256b);
+}
+.live-cam-window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 18px #ffb7251f;
+  animation: casterFramePulse 3.4s ease-in-out infinite;
+}
+#liveCamWrap1 {
+  left: var(--livcam-x);
+  top: var(--livcam-y);
+  width: var(--livcam-w);
+  height: var(--livcam-h);
+}
+#liveCamWrap2 {
+  left: var(--livcam2-x);
+  top: var(--livcam2-y);
+  width: var(--livcam2-w);
+  height: var(--livcam2-h);
+}
+.cam-plate-live {
+  top: calc(var(--livcam-y) + var(--livcam-h) + 8px);
+  left: var(--livcam-x);
+  width: var(--livcam-w);
+}
+#livePlate2 {
+  top: calc(var(--livcam2-y) + var(--livcam2-h) + 8px);
+  left: var(--livcam2-x);
+  width: var(--livcam2-w);
+}
+/* ?frame=off — no camera expected: stop punching holes and hide every bit
+   of frame dressing (the overlay is drawn as if the camera never existed). */
+.broadcast.frame-off .caster-background,
+.broadcast.frame-off .operator-backplate,
+.broadcast.frame-off .motion-arsenal {
+  mask-image: none;
+}
+.broadcast.frame-off .caster-photo-wrap,
+.broadcast.frame-off .cam-corners-second,
+.broadcast.frame-off .cam-plate,
+.broadcast.frame-off .live-cams,
+.broadcast.frame-off #casterPanel::before,
+.broadcast.frame-off #casterPanel::after {
+  display: none !important;
+}
+/* Without a camera the name block owns the full frame instead of hugging a
+   window that is not there. */
+.broadcast.frame-off .state-caster .caster-copy,
+.broadcast.frame-off .state-countdown .caster-copy {
+  left: clamp(34px, 8vw, 145px);
+}

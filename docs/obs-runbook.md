@@ -16,6 +16,20 @@ the numbered files **1 → 4** in order. Under the hood they run
 - Recording: `C:\Users\rajpa\Videos\BGMI-Cup-Recordings` — hybrid MP4, HQ
   (never the stream bitrate/container)
 
+## First run on a new machine (fresh clone)
+
+1. Install **OBS Studio 28+** (the WebSocket server is built in) and
+   **Python 3**, open OBS once, then set the websocket password where the
+   scripts can read it: `setx OBS_WEBSOCKET_PASSWORD "<from OBS → Tools →
+   WebSocket Server Settings>"` (or add it to the repo `.env`).
+2. Build the tooling venv once:
+   `powershell -ExecutionPolicy Bypass -File scripts\obs\setup_env.ps1`.
+3. Start the platform once (`Setup\1 - Start Platform Server.bat`) so the
+   database and the overlay token exist, then run
+   `Setup\Rebuild OBS Setup.bat` — it creates the OBS profile and the whole
+   16-scene collection from scratch on this machine. From then on it is the
+   normal 1 → 4 routine below.
+
 ## Startup order (every broadcast day)
 
 Everything you need is in the **`Setup`** folder — double-click the numbered

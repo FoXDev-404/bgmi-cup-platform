@@ -130,8 +130,8 @@ Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
    keyboard: `S` start/end, `U` undo, `R` refresh, `ESC` close menus.
 4. **Verify and publish** (gated: every squad needs a placement) — points
    flow into standings, `/live`, `/results` and the overlays immediately.
-5. `/admin/overlays` → copy the 16 overlay URLs into OBS browser sources
-   (1920×1080, transparent). Each URL carries a rotatable token.
+5. `/admin/overlays` → the 16 token-gated overlay URLs (rotate the token
+   here). The OBS side is built for you — see **OBS setup** below.
 6. `/admin/caster` → standings + push any player's stat card; the pushed
    card shows on the caster desk (the original overlay set has no card
    scene — see docs/merge-progress.md R2-2 for the missing-scene list).
@@ -225,14 +225,23 @@ the overlay token is generated into the database and rotatable from
 
 ## OBS setup (overlays)
 
-1. In OBS add a **Browser** source per overlay you want.
-2. URL: copy from `/admin/overlays` (each contains `?token=…`); width
-   `1920`, height `1080`; leave "Shutdown source when not visible" off so
-   SSE reconnects cleanly.
-3. Backgrounds are transparent — safe to stack. Load the `hidden` scene on
-   any source to blank it.
-4. Rotating the token on `/admin/overlays` invalidates every copied URL at
-   once — paste the new URLs into OBS after rotating.
+One command builds the whole OBS side (Windows, OBS Studio 28+, Python 3):
+
+1. Once per machine: `powershell -ExecutionPolicy Bypass -File
+   scripts\obs\setup_env.ps1` (tooling venv), and point the scripts at
+   obs-websocket: `setx OBS_WEBSOCKET_PASSWORD "<from OBS → Tools →
+   WebSocket Server Settings>"` (or add it to the repo `.env`).
+2. Start the platform once (`Setup\1 - Start Platform Server.bat`, creates
+   the database + overlay token), then run `Setup\Rebuild OBS Setup.bat` —
+   it builds the "BGMI Cup v2" collection: 16 scenes, each with its **own**
+   browser source, cameras, audio chain and hotkeys.
+3. Every broadcast day: `Setup\1…4` in order, wait for READY. Hotkeys,
+   token rotation and troubleshooting: [docs/obs-runbook.md](docs/obs-runbook.md).
+
+Manual fallback: one dedicated **Browser** source per scene — URL from
+`/admin/overlays` (carries `?token=…`), 1920×1080, transparent; **never
+share one browser source across scenes**. Rotating the token invalidates
+every copied URL at once.
 
 ## Backup & restore
 

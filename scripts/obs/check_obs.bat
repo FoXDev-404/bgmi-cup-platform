@@ -19,7 +19,11 @@ chcp 65001 >nul
 
 set "HERE=%~dp0"
 set "PY=%HERE%.venv\Scripts\python.exe"
-if not exist "%PY%" set "PY=python"
+if not exist "%PY%" (
+  set "PY=python"
+  echo [!] scripts\obs\.venv not found - run scripts\obs\setup_env.ps1 once.
+  echo     Falling back to system python ^(needs websocket-client installed^).
+)
 
 "%PY%" "%HERE%check_obs.py" %*
 set "RC=%ERRORLEVEL%"

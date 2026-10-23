@@ -1,5 +1,5 @@
 /* ============================================================
-   BGMI CUP NOIDA 2026 — TEAM REGISTRATION
+   BGMI CUP — TEAM REGISTRATION
    Validation, roster management, logo upload, squad pass.
    ============================================================ */
 
@@ -8,42 +8,9 @@
 
   var jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
 
-  var EVENT_DATE = new Date('2026-11-14T16:00:00+05:30');
   var MAX_ATTEMPTS = 3;
   var ENDPOINT = '/api/register';
   var CSRF_ENDPOINT = '/api/csrf';
-
-  /* ===== COUNTDOWN ===== */
-  function updateCountdown() {
-    var now = new Date();
-    var diff = EVENT_DATE - now;
-
-    var ids = ['cd-days', 'cd-hours', 'cd-mins', 'cd-secs'];
-    if (diff <= 0) {
-      ids.forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) el.textContent = '00';
-      });
-      return;
-    }
-
-    var days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    diff -= days * 1000 * 60 * 60 * 24;
-    var hours = Math.floor(diff / (1000 * 60 * 60));
-    diff -= hours * 1000 * 60 * 60;
-    var mins = Math.floor(diff / (1000 * 60));
-    diff -= mins * 1000 * 60;
-    var secs = Math.floor(diff / 1000);
-
-    var vals = [days, hours, mins, secs];
-    ids.forEach(function (id, i) {
-      var el = document.getElementById(id);
-      if (el) el.textContent = String(vals[i]).padStart(2, '0');
-    });
-  }
-
-  updateCountdown();
-  setInterval(updateCountdown, 1000);
 
   /* ===== NAVBAR ===== */
   var navbar = document.getElementById('navbar');
@@ -942,8 +909,8 @@
     generateQR('teamQR', encodeQR((reg.regCode || reg.teamId) + ' | ' + reg.teamName + ' [' + reg.teamTag + ']'));
 
     /* share links */
-    var shareText = 'Squad up: ' + reg.teamName + ' [' + reg.teamTag + '] is registered for the BGMI Cup Noida 2026! Team ID: ' + reg.teamId + ' #BGMI #BGMICupNoida';
-    var waText = 'Squad up: ' + reg.teamName + ' [' + reg.teamTag + '] is registered for the BGMI Cup Noida 2026! Team ID: ' + reg.teamId;
+    var shareText = 'Squad up: ' + reg.teamName + ' [' + reg.teamTag + '] is registered for the BGMI Cup! Team ID: ' + reg.teamId + ' #BGMI #BGMICup';
+    var waText = 'Squad up: ' + reg.teamName + ' [' + reg.teamTag + '] is registered for the BGMI Cup! Team ID: ' + reg.teamId;
 
     document.getElementById('shareTwitter').href =
       'https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareText);
@@ -1022,7 +989,7 @@
       doc.setTextColor(ACID[0], ACID[1], ACID[2]);
       doc.setFont('courier', 'bold');
       doc.setFontSize(7);
-      doc.text('BGMI CUP NOIDA \u2022 MMXXVI', 10, 12);
+      doc.text('BGMI CUP \u2022 SQUAD PASS', 10, 12);
 
       doc.setTextColor(INK[0], INK[1], INK[2]);
       doc.setFont('helvetica', 'bold');
@@ -1034,7 +1001,7 @@
       doc.setTextColor(BEIGE[0], BEIGE[1], BEIGE[2]);
       doc.text('TAG: ' + pendingReg.teamTag + '   GUILD: ' + pendingReg.guildName, 10, 29);
       doc.text('CAPTAIN: ' + pendingReg.capIgn + '  UID ' + pendingReg.capUid, 10, 34);
-      doc.text('DATE: 14 NOV 2026 \u2022 LOBBY 4:00 PM IST \u2022 SQUAD TPP \u2022 6 ROUNDS', 10, 39);
+      doc.text('MODE: SQUAD TPP \u2022 6 ROUNDS \u2022 ENTRY: FREE', 10, 39);
 
       var y = 47;
       doc.setFontSize(7);

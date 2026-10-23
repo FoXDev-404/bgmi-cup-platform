@@ -75,11 +75,11 @@ without `--overwrite`. Both scripts print row counts only — no PII.
 | Path | Purpose |
 |---|---|
 | `server.py` | Static file server + JSON API + SQLite storage + notification worker |
-| `public/bgmi-team-registration.html` | Registration page (hero, countdown, rules, form, review step, confirmation with Reg ID) |
+| `public/bgmi-team-registration.html` | Registration page (general hero, rules, form, review step, confirmation with Reg ID) |
 | `public/status.html` | Public "Check your status" page (Reg ID + captain phone/email, last-updated + next steps) |
 | `public/teams.html` | Public approved-teams grid with search + group filter (off unless enabled in Settings) |
 | `public/rules.html` | `/rules` — curated house rules, tournament config, format, fair play (same text as registration) |
-| `public/schedule.html` | `/schedule` — settings-driven day-of schedule + match plan (start times) + timezone + last-updated (gated with `/teams`) |
+| `public/schedule.html` | `/schedule` — event details + settings-driven day-of schedule + match plan (start times) + timezone + last-updated (gated with `/teams`) |
 | `public/admin.html` | Control Room — session login, queue, team detail, groups, audit, notifications, settings |
 | `public/admin-login.html` | Control Room login screen (served by `/admin` when logged out) |
 | `public/about.html` | About page (Who we are + team cards), served at `/about` too |

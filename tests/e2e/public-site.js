@@ -157,6 +157,17 @@ async function revealAll(page) {
           String(lineup.watermarks));
       }
 
+      if (p === '/schedule') {
+        /* Noida event details live on the schedule page, not the home page */
+        const eventText = await page.locator('.event-card').innerText().catch(() => '');
+        check(`${current} event card carries the Noida details`,
+          /BGMI CUP NOIDA 2026/i.test(eventText) &&
+          /14 NOVEMBER 2026/i.test(eventText) &&
+          /GALGOTIAS POLYTECHNIC/i.test(eventText) &&
+          /GREATER NOIDA/i.test(eventText),
+          eventText.replace(/\s+/g, ' ').slice(0, 100));
+      }
+
       if (p === '/') {
         /* hero: crimson battlefield backdrop layer loads and covers */
         const hero = await page.evaluate(() => {
@@ -177,7 +188,7 @@ async function revealAll(page) {
         check(`${current} hero backdrop covers viewport`, hero.size === 'cover',
           hero.size);
 
-        /* hero reference recreation: title, copy, CTAs, countdown, stats, HUD */
+        /* hero: general platform copy, CTAs, stats, HUD */
         const heroBits = await page.evaluate(() => {
           const txt = (sel) => (document.querySelector(sel) || {}).textContent || '';
           const pill = document.querySelector('.hero-cta .btn-primary');
@@ -188,40 +199,39 @@ async function revealAll(page) {
             title: txt('.hero-title'),
             date: txt('.hero-date'),
             tagline: txt('.hero-tagline'),
-            labels: txt('.countdown-box'),
             stats: txt('.hero-stats'),
             register: pill ? pill.getAttribute('href') : '',
             rules: rulesHref,
             rulesTarget: !!document.querySelector(rulesHref || '#__missing'),
             hud: txt('.hero-hud--tl') + txt('.hero-hud--bl') + txt('.hero-hud--br'),
-            cdLive: /^\d{1,3}$/.test(txt('#cd-days').trim()),
+            pageText: document.body.innerText,
           };
         });
         check(`${current} hero title lines`,
-          /BGMI CUP/.test(heroBits.title) && /NOIDA/.test(heroBits.title) &&
-          /2026/.test(heroBits.title) &&
+          /BGMI CUP/.test(heroBits.title) && /SQUAD UP/.test(heroBits.title) &&
+          /GET IN/.test(heroBits.title) &&
           /BATTLEGROUNDS MOBILE INDIA/.test(heroBits.eyebrow),
           heroBits.title.replace(/\s+/g, ' ').trim().slice(0, 60));
         check(`${current} hero date + tagline copy`,
-          /14 NOVEMBER/.test(heroBits.date) && /MMXXVI/.test(heroBits.date) &&
-          /Four squads\. One drop\. Zero mercy\./.test(heroBits.tagline) &&
+          /REGISTRATION OPEN/.test(heroBits.date) && /SQUAD TPP/.test(heroBits.date) &&
+          /Four starters\. Two subs\. Zero excuses\./.test(heroBits.tagline) &&
           /not your ego/.test(heroBits.tagline));
-        check(`${current} countdown units live`,
-          /DAYS/i.test(heroBits.labels) && /HOURS/i.test(heroBits.labels) &&
-          /MINUTES/i.test(heroBits.labels) && /SECONDS/i.test(heroBits.labels) &&
-          heroBits.cdLive,
-          heroBits.labels.replace(/\s+/g, ' ').trim().slice(0, 70));
+        check(`${current} home stays general (no Noida event copy)`,
+          !/NOIDA/i.test(heroBits.pageText) &&
+          !/14 NOVEMBER/i.test(heroBits.pageText) &&
+          !/MMXXVI/i.test(heroBits.pageText),
+          heroBits.pageText.match(/NOIDA|14 NOVEMBER|MMXXVI/i) || 'clean');
         check(`${current} hero CTAs wired`,
           heroBits.register === '#register' && heroBits.rules === '#rules' &&
           heroBits.rulesTarget,
           `register=${heroBits.register} rules=${heroBits.rules}`);
         check(`${current} stats strip values`,
-          /04/.test(heroBits.stats) && /TEAMS/i.test(heroBits.stats) &&
-          /06/.test(heroBits.stats) && /MATCHES/i.test(heroBits.stats) &&
-          /01/.test(heroBits.stats) && /CHAMPION/i.test(heroBits.stats));
+          /04/.test(heroBits.stats) && /STARTERS/i.test(heroBits.stats) &&
+          /02/.test(heroBits.stats) && /SUBS/i.test(heroBits.stats) &&
+          /01/.test(heroBits.stats) && /ACCOUNT/i.test(heroBits.stats));
         check(`${current} hero HUD labels`,
-          /GREATER NOIDA/.test(heroBits.hud) &&
-          /LIVE THE BATTLE/.test(heroBits.hud) && /INDIA/.test(heroBits.hud) &&
+          /BGMI CUP/.test(heroBits.hud) &&
+          /SQUAD TPP/.test(heroBits.hud) && /INDIA/i.test(heroBits.hud) &&
           /MORE THAN A TOURNAMENT/.test(heroBits.hud),
           heroBits.hud.replace(/\s+/g, ' ').trim().slice(0, 70));
       }

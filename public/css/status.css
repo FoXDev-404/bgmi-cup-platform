@@ -343,6 +343,49 @@
 
 .sched-row--done { opacity: 0.55; }
 
+/* ---- schedule page: event info card ---- */
+
+.event-card { margin-top: 0; }
+
+.event-title {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(1.5rem, 3.8vw, 2.1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  margin: 0 0 16px;
+}
+
+.event-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 22px;
+  margin: 0;
+}
+
+.event-grid div { min-width: 0; }
+
+.event-grid dt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(237, 230, 211, 0.5);
+  margin-bottom: 4px;
+}
+
+.event-grid dd {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: rgba(237, 230, 211, 0.9);
+}
+
+@media (max-width: 560px) {
+  .event-grid { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   *,

@@ -365,9 +365,13 @@ def main():
 
     # ---------- exports ----------
     print("\n[exports]")
-    st, body = T.http("GET", "/api/admin/export/approved.csv", headers=T.ah())
+    st, body, hdrs = T.http_h("GET", "/api/admin/export/approved.csv",
+                              headers=T.ah())
     report("approved CSV downloads", st == 200 and b"reg_code" in body,
            "status=%s" % st)
+    report("approved CSV response is not cached",
+           (hdrs.get("Cache-Control") or "").lower() == "no-store",
+           repr(hdrs.get("Cache-Control")))
     st, body = T.http("GET", "/api/admin/export/groups.csv", headers=T.ah())
     report("groups CSV downloads", st == 200 and b"team_name" in body,
            "status=%s" % st)

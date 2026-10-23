@@ -650,6 +650,16 @@ def main():
     report("static page sends Referrer-Policy",
            bool(hdrs.get("Referrer-Policy")),
            repr(hdrs.get("Referrer-Policy")))
+    st, body, hdrs = http_h(
+        "GET", "/", headers={"X-Forwarded-Proto": "https"})
+    report("HTTPS responses send HSTS",
+           (hdrs.get("Strict-Transport-Security") or "").startswith("max-age="),
+           repr(hdrs.get("Strict-Transport-Security")))
+    report("static page sends Permissions-Policy",
+           bool(hdrs.get("Permissions-Policy")),
+           repr(hdrs.get("Permissions-Policy")))
+    report("CSP sets frame-ancestors",
+           "frame-ancestors" in (hdrs.get("Content-Security-Policy") or ""))
     st, body, hdrs = http_h("GET", "/api/health")
     report("JSON responses send nosniff",
            (hdrs.get("X-Content-Type-Options") or "").lower() == "nosniff")

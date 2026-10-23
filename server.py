@@ -17,12 +17,16 @@ roster_members.uid — "one account per player" is enforced at the DB level.
 
 Run:  python server.py            (HOST=127.0.0.1 PORT=8080 by default)
 Env:  PORT, HOST, BGMI_DB, BGMI_UPLOADS, BGMI_SMTP_* (optional mail),
-      BGMI_RATE_LIMIT (submissions per window), BGMI_RATE_WINDOW (seconds)
+      BGMI_RATE_LIMIT (submissions per window), BGMI_RATE_WINDOW (seconds),
+      BGMI_SSE_MAX_CLIENTS / BGMI_SSE_MAX_PER_IP (live-stream caps)
 """
 
 import base64
+import csv
 import hashlib
 import hmac
+import io
+import ipaddress
 import json
 import os
 import queue
@@ -62,6 +66,12 @@ SESSION_TTL = int(os.environ.get("BGMI_SESSION_TTL", "1209600"))  # absolute cap
 SESSION_IDLE_TTL = int(os.environ.get("BGMI_SESSION_IDLE_TTL", "28800"))  # 8h
 NOTIFY_MAX_ATTEMPTS = int(os.environ.get("BGMI_NOTIFY_ATTEMPTS", "5"))
 SLOT_LIMIT = int(os.environ.get("BGMI_SLOT_LIMIT", "16"))
+
+# Live streams are long-lived; cap them so a client cannot exhaust the
+# ThreadingHTTPServer worker pool by opening an unbounded number of SSE
+# connections.  Per-IP is deliberately roomy for shared campus NATs.
+SSE_MAX_CLIENTS = int(os.environ.get("BGMI_SSE_MAX_CLIENTS", "500"))
+SSE_MAX_PER_IP = int(os.environ.get("BGMI_SSE_MAX_PER_IP", "50"))
 
 # Optional e-mail notifications (free SMTP, e.g. Gmail app password).
 # When unset the notifier skips silently, as designed.
@@ -131,6 +141,8 @@ def v_guild(val):
     val = (val or "").strip()
     if len(val) < 2:
         raise ValidationError("Enter your in-game guild name.", "guildName")
+    if len(val) > 48:
+        raise ValidationError("Keep guild names to 48 characters.", "guildName")
     if "<" in val or ">" in val:
         raise ValidationError("No angle brackets in guild names.", "guildName")
     return val
@@ -154,6 +166,8 @@ def v_uid(val, field=None):
 
 def v_email(val):
     val = (val or "").strip()
+    if len(val) > 254:
+        raise ValidationError("That email address is too long.", "capEmail")
     if not RE_EMAIL.match(val):
         raise ValidationError("That email doesn't look right.", "capEmail")
     return val.lower()
@@ -176,6 +190,32 @@ def v_discord(val):
         raise ValidationError(
             "Discord handles: letters, numbers, dots, underscores.", "capDiscord")
     return val
+
+
+# Excel/LibreOffice evaluate a cell as a formula when it starts with one of
+# these characters.  Player-controlled text (team/guild names, IGNs, notes)
+# must therefore be prefixed before it reaches a CSV export.  Numbers are
+# left as numbers so negative values (e.g. a delta) remain useful.
+CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def csv_cell(value):
+    if value is None:
+        return ""
+    if isinstance(value, (int, float)):
+        return value
+    text = str(value)
+    if text.startswith(CSV_FORMULA_PREFIXES):
+        return "'" + text
+    return text
+
+
+def csv_body(rows):
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    for row in rows:
+        writer.writerow([csv_cell(cell) for cell in row])
+    return buf.getvalue().encode("utf-8-sig")   # Excel-friendly BOM
 
 
 LOGO_MAGIC = (
@@ -1111,6 +1151,68 @@ def rate_clear(ip, bucket):
         rate_hits.pop(key, None)
 
 
+class SseLimiter:
+    """Count live SSE streams and enforce global/per-IP ceilings.
+
+    A dedicated class (rather than the sliding-window rate limiter) is used
+    because an SSE slot is held for the whole connection and must be released
+    exactly when the stream ends."""
+
+    def __init__(self, max_total, max_per_ip):
+        self.max_total = max(int(max_total), 0)
+        self.max_per_ip = max(int(max_per_ip), 0)
+        self._lock = threading.Lock()
+        self._total = 0
+        self._by_ip = {}
+
+    def acquire(self, ip):
+        with self._lock:
+            if self._total >= self.max_total:
+                return False
+            count = self._by_ip.get(ip, 0)
+            if count >= self.max_per_ip:
+                return False
+            self._total += 1
+            self._by_ip[ip] = count + 1
+            return True
+
+    def release(self, ip):
+        with self._lock:
+            count = self._by_ip.get(ip, 0)
+            if count <= 0:
+                return
+            if count == 1:
+                self._by_ip.pop(ip, None)
+            else:
+                self._by_ip[ip] = count - 1
+            self._total -= 1
+
+
+SSE_LIMITER = SseLimiter(SSE_MAX_CLIENTS, SSE_MAX_PER_IP)
+
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _canonical_ip(raw):
+    """Return a canonical IP string, or '' when the header is malformed."""
+    try:
+        return str(ipaddress.ip_address((raw or "").strip()))
+    except ValueError:
+        return ""
+
+
+def _is_trusted_proxy_peer(peer):
+    """True for loopback/private/CGNAT peers (local tunnel, Railway edge)."""
+    try:
+        ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    if getattr(ip, "ipv4_mapped", None):
+        ip = ip.ipv4_mapped
+    return bool(ip.is_loopback or ip.is_private or ip.is_link_local or
+                (isinstance(ip, ipaddress.IPv4Address) and ip in _CGNAT))
+
+
 # ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
@@ -1199,6 +1301,16 @@ class Handler(BaseHTTPRequestHandler):
         # uploaded images can never be sniffed into HTML/script
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+        # Railway terminates TLS at its public edge and always forwards this
+        # header.  HSTS is only meaningful on HTTPS (browsers ignore it over
+        # plain HTTP), so emit it conditionally rather than on localhost.
+        proto = (self.headers.get("X-Forwarded-Proto") or "").split(",", 1)[0]
+        if proto.strip().lower() == "https":
+            self.send_header("Strict-Transport-Security",
+                             "max-age=31536000")
         # Strict CSP — every script is external ('self'), no inline handlers.
         # inline style= attributes remain (style-src unsafe-inline only
         # affects CSS, not script); Google Fonts for the admin/public theme,
@@ -1214,7 +1326,8 @@ class Handler(BaseHTTPRequestHandler):
             "frame-src 'self'; "
             "object-src 'none'; "
             "base-uri 'self'; "
-            "form-action 'self'")
+            "form-action 'self'; "
+            "frame-ancestors 'self'")
         # admin pages must never be framed (clickjacking); overlay shells
         # stay frameable so the producer preview iframe works.
         path = getattr(self, "path", "") or ""
@@ -1223,19 +1336,14 @@ class Handler(BaseHTTPRequestHandler):
         super().end_headers()
 
     def send_csv(self, filename, rows):
-        import csv
-        import io
         self.drain_body()
-        buf = io.StringIO()
-        w = csv.writer(buf)
-        for r in rows:
-            w.writerow(r)
-        body = buf.getvalue().encode("utf-8-sig")   # Excel-friendly BOM
+        body = csv_body(rows)
         self.send_response(200)
         self.send_header("Content-Type", "text/csv; charset=utf-8")
         self.send_header("Content-Disposition",
                          'attachment; filename="%s"' % filename)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         if not self._head_only:
             self.wfile.write(body)
@@ -1356,14 +1464,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def client_ip(self):
         peer = self.client_address[0]
+        canonical_peer = _canonical_ip(peer) or peer
+        try:
+            peer_ip = ipaddress.ip_address(peer)
+        except ValueError:
+            return peer
+        if getattr(peer_ip, "ipv4_mapped", None):
+            peer_ip = peer_ip.ipv4_mapped
         # Behind the local cloudflared tunnel every request arrives from
         # loopback; trust the visitor IP Cloudflare forwards so the per-IP
         # rate limit stays per-visitor instead of one shared budget.
-        if peer in ("127.0.0.1", "::1"):
-            fwd = self.headers.get("Cf-Connecting-Ip")
+        if peer_ip.is_loopback:
+            fwd = _canonical_ip(self.headers.get("Cf-Connecting-Ip"))
             if fwd:
-                return fwd.strip()
-        return peer
+                return fwd
+        # Railway's public edge overwrites X-Real-IP and connects from its
+        # private network.  Trust it only for loopback/private/CGNAT peers,
+        # or when Railway explicitly tells us we run behind its edge.  A
+        # direct public client therefore cannot spoof the header to rotate
+        # rate-limit/CSRF buckets.
+        if (_is_trusted_proxy_peer(peer) or
+                os.environ.get("RAILWAY_ENVIRONMENT")):
+            fwd = _canonical_ip(self.headers.get("X-Real-IP"))
+            if fwd:
+                return fwd
+        return canonical_peer
 
     def log_message(self, fmt, *args):
         msg = fmt % args
@@ -1408,8 +1533,15 @@ class Handler(BaseHTTPRequestHandler):
         connection is detectable. Cleaned up on any write failure so closed
         tabs never leak threads."""
         self.close_connection = True
-        _, token, q = broadcast.HUB.subscribe(topic)
+        ip = self.client_ip()
+        if not SSE_LIMITER.acquire(ip):
+            return self.send_json(
+                {"ok": False,
+                 "error": "Too many live connections. Try again shortly."},
+                429, headers={"Retry-After": "30"})
+        token = None
         try:
+            _, token, q = broadcast.HUB.subscribe(topic)
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
@@ -1435,7 +1567,9 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, TimeoutError, OSError):
             pass
         finally:
-            broadcast.HUB.unsubscribe(topic, token)
+            if token is not None:
+                broadcast.HUB.unsubscribe(topic, token)
+            SSE_LIMITER.release(ip)
 
     # ---- overlay data (token gated) ----------------------------------------
 

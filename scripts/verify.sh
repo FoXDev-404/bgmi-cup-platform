@@ -70,6 +70,7 @@ python tests/test_admin.py || FAILED="$FAILED test_admin"
 python tests/test_broadcast.py || FAILED="$FAILED test_broadcast"
 python tests/test_flow.py || FAILED="$FAILED test_flow"
 python tests/test_seed.py || FAILED="$FAILED test_seed"
+python tests/test_security.py || FAILED="$FAILED test_security"
 
 echo "==== playwright specs ===="
 npx playwright test --reporter=line || FAILED="$FAILED playwright"

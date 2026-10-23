@@ -230,6 +230,7 @@ settings live in the database (`overlay_settings`).
 | `BGMI_SLOT_LIMIT` | `16` | Approved-slot limit |
 | `BGMI_RATE_LIMIT` / `BGMI_RATE_WINDOW` | `30` / `3600` | Register POSTs per IP per window (seconds) |
 | `BGMI_STATUS_RATE_LIMIT` / `BGMI_STATUS_RATE_WINDOW` | `5` / `60` | Status lookups per IP per window (seconds) |
+| `BGMI_SSE_MAX_CLIENTS` / `BGMI_SSE_MAX_PER_IP` | `500` / `50` | Live SSE connections: global cap / per-IP cap |
 | `BGMI_SESSION_TTL` / `BGMI_SESSION_IDLE_TTL` | `1209600` / `28800` | Admin session absolute cap / idle timeout (seconds) |
 | `BGMI_SMTP_HOST` / `BGMI_SMTP_PORT` / `BGMI_SMTP_USER` / `BGMI_SMTP_PASS` / `BGMI_SMTP_FROM` | *(unset)* / `587` | Optional e-mail; SMTP unset → jobs are marked *skipped* |
 | `BGMI_NOTIFY_ATTEMPTS` / `BGMI_NOTIFY_POLL` | `5` / `30` | Send attempts before *failed* / worker tick (seconds) |

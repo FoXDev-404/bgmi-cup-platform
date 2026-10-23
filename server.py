@@ -51,6 +51,7 @@ HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8080"))
 DB_PATH = os.environ.get("BGMI_DB", os.path.join(DATA_DIR, "registrations.db"))
 UPLOAD_DIR = os.environ.get("BGMI_UPLOADS", os.path.join(DATA_DIR, "uploads"))
+_ENSURED_DB_DIR = None   # BGMI_DB parent folder already checked/created
 RATE_LIMIT = int(os.environ.get("BGMI_RATE_LIMIT", "30"))
 RATE_WINDOW = int(os.environ.get("BGMI_RATE_WINDOW", "3600"))
 STATUS_RATE_LIMIT = int(os.environ.get("BGMI_STATUS_RATE_LIMIT", "5"))
@@ -497,7 +498,36 @@ DEFAULT_SETTINGS = {
 }
 
 
+def _ensure_db_dir():
+    """Create BGMI_DB's folder when a fresh deploy boots before its volume.
+
+    On Railway the DB lives under /data, which only exists once the volume is
+    mounted; creating it keeps the server reachable and the warning tells the
+    operator how to make the storage durable.
+    """
+    global _ENSURED_DB_DIR
+    parent = os.path.dirname(os.path.abspath(DB_PATH))
+    if parent == _ENSURED_DB_DIR:
+        return
+    if not os.path.isdir(parent):
+        try:
+            os.makedirs(parent, exist_ok=True)
+        except OSError as exc:
+            raise SystemExit(
+                "[data] cannot create database folder %s: %s\n"
+                "       On Railway, mount a volume at /data (service -> "
+                "Volumes -> mount path /data) or set BGMI_DB to a writable "
+                "path." % (parent, exc))
+        print("[data] created database folder %s" % parent)
+        if os.environ.get("RAILWAY_ENVIRONMENT"):
+            print("[data] WARNING: no volume found at %s - registrations will "
+                  "be lost on redeploy. Mount a Railway volume there."
+                  % parent)
+    _ENSURED_DB_DIR = parent
+
+
 def db():
+    _ensure_db_dir()
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")

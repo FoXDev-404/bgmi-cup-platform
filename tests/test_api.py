@@ -964,6 +964,24 @@ def main():
            fresh_tz == "Asia/Kolkata" and fresh_sched == "",
            "tz=%r sched=%r" % (fresh_tz, fresh_sched))
 
+    # A fresh deploy (e.g. Railway) can boot before the volume is mounted: the
+    # server must create BGMI_DB's folder instead of dying in sqlite3.connect.
+    missing_root = tempfile.mkdtemp(prefix="bgmi_missing_")
+    missing_db = os.path.join(missing_root, "data", "fresh.db")
+    srv.DB_PATH = missing_db
+    try:
+        srv.init_db()
+        folder_created = os.path.isfile(missing_db)
+        init_error = ""
+    except Exception as exc:                       # surfaced via report()
+        folder_created = False
+        init_error = "%s: %s" % (type(exc).__name__, exc)
+    finally:
+        srv.DB_PATH = old_db_path
+        shutil.rmtree(missing_root, ignore_errors=True)
+    report("missing database folder is created on startup",
+           folder_created, init_error or missing_db)
+
     # ---------- cleanup ----------
     # remove every team this suite registered so runs never leave test
     # registrations behind in the real database; the throwaway admin

@@ -98,7 +98,7 @@ without `--overwrite`. Both scripts print row counts only — no PII.
 | `scripts/seed_demo.py` | Backup-first demo reseed: 32 anime squads 16/16 in Group A+B, one scheduled match per group with start times, DEMO DATA badge |
 | `scripts/backup_db.py` | Consistent online backup of `registrations.db` (integrity-checked) |
 | `scripts/restore_db.py` | Restore a backup (temp file + atomic replace, `--overwrite` guard) |
-| `tests/test_api.py` | End-to-end API suite (104 checks, self-hosted + isolated by default) |
+| `tests/test_api.py` | End-to-end API suite (105 checks, self-hosted + isolated by default) |
 | `tests/test_admin.py` | Approval-workflow suite (94 checks, includes a 61s rate-limit wait) |
 | `tests/*.spec.js` | Playwright browser specs (review step + link/asset checks) |
 | `data/` | Live data: `registrations.db` + `uploads/` (gitignored; `.gitkeep` tracks the folder) |

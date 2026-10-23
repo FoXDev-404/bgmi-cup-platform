@@ -1,7 +1,7 @@
 # Tests
 
 ```powershell
-python tests/test_api.py           # 104 checks
+python tests/test_api.py           # 105 checks
 python tests/test_admin.py         # 97 checks (waits 61s once for the public lookup bucket)
 python tests/test_broadcast.py     # 144 checks (scoring engine, desk, overlays, purge)
 python tests/test_flow.py          # admin FLOW workflow-status endpoint + status logic

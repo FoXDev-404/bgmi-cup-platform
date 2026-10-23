@@ -85,6 +85,24 @@ python server.py                       # http://127.0.0.1:8080
 
 Change the bind with `HOST` / `PORT` (`$env:PORT='9000'; python server.py`).
 
+## Deploy on Railway
+
+The repo ships [`railpack.json`](railpack.json): Railpack builds a Python 3.13
+image and runs `python server.py` with `HOST=0.0.0.0`, the SQLite database at
+`/data/registrations.db` and logos at `/data/uploads`.
+
+1. **Mount a volume at `/data`** — service → **Volumes** → mount path `/data`.
+   Without it the app still boots (the folder is created and a warning is
+   logged), but every redeploy wipes registrations.
+2. **Create the admin account once** — set `BGMI_ADMIN_USER` and
+   `BGMI_ADMIN_PASSWORD` on the service, then run
+   `python scripts/create_admin.py` as a one-off command (or from the Railway
+   shell). There are no default credentials.
+3. Railway injects `PORT`; leave it as is. SMTP variables are optional — mail
+   is skipped when they are unset.
+
+Health check: `GET /api/health` → `{ok, count}`.
+
 ## Route map
 
 **Public** (no login):
